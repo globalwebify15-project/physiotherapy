@@ -6,8 +6,8 @@ class ApiService {
   final _storage = const FlutterSecureStorage();
 
   // Toggle Mock Mode for offline testing/demo
-  static const bool _useMockMode = true;
-  static const String _baseUrl = 'http://192.168.1.12:3000/api';
+  static const bool _useMockMode = false;
+  static const String _baseUrl = 'https://physiotherapy-backend-nextjs.vercel.app/api';
 
   // In-memory mock databases for session persistence
   static final List<Map<String, dynamic>> _mockAppointments = [
