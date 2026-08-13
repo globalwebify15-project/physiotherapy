@@ -1,0 +1,15 @@
+{
+  "name": "physiotherapy-platform",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "database"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=apps/backend-nextjs",
+    "dev:admin": "npm run dev --workspace=apps/admin-nextjs",
+    "seed:db": "npm run seed --workspace=database"
+  }
+}

@@ -1,0 +1,66 @@
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+build/
+dist/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+devPlan.md
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Operating System
+.DS_Store
+Thumbs.db
+
+# Database / Local cache
+db/
+*.log
+.mongo/
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+ios/.symlinks/
+ios/Pods/
+ios/Flutter/.last_build_id
+android/.gradle/
+android/app/local.properties
+android/app/flutter_bootstrap.properties
+*.keystore
+*.jks
+*.p12
+*.pem
+*.key
+google-services.json
+GoogleService-Info.plist
+
+# Temp/Scratch files
+scratch/
+tmp/
+
+# Native builds
+*.apk
+*.zip
+

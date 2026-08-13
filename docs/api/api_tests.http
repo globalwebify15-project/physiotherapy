@@ -1,0 +1,113 @@
+### PHYSIOTHERAPY APPOINTMENT PLATFORM API TESTS
+@baseUrl = http://localhost:3001/api
+
+### 1. Send OTP (Patient Authentication)
+# @name sendOtp
+POST {{baseUrl}}/auth/otp/send
+Content-Type: application/json
+
+{
+  "mobile": "9876543219"
+}
+
+### 2. Verify OTP (Patient Log in / Register)
+# @name verifyOtp
+POST {{baseUrl}}/auth/otp/verify
+Content-Type: application/json
+
+{
+  "mobile": "9876543219",
+  "otp": "123456"
+}
+
+### Save access token from verifyOtp
+@patientToken = {{verifyOtp.response.body.accessToken}}
+@patientId = {{verifyOtp.response.body.patient.id}}
+
+### 3. Admin Staff Login
+# @name adminLogin
+POST {{baseUrl}}/auth/admin/login
+Content-Type: application/json
+
+{
+  "email": "admin@globalwebify.com",
+  "password": "admin123"
+}
+
+### Save admin token from adminLogin
+@adminToken = {{adminLogin.response.body.accessToken}}
+
+### 4. Fetch Services (Public)
+# @name fetchServices
+GET {{baseUrl}}/services
+
+### Save service ID from response
+@serviceId = {{fetchServices.response.body.services[0]._id}}
+
+### 5. Fetch Therapists (Public)
+# @name fetchTherapists
+GET {{baseUrl}}/therapists
+
+### Save therapist ID from response
+@therapistId = {{fetchTherapists.response.body.therapists[0]._id}}
+
+### 6. Fetch Available Slots for Therapist
+GET {{baseUrl}}/appointments/slots?date=2026-08-12&therapistId={{therapistId}}
+
+### 7. Book an Appointment (As Patient)
+# @name bookAppointment
+POST {{baseUrl}}/appointments
+Authorization: Bearer {{patientToken}}
+Content-Type: application/json
+
+{
+  "serviceId": "{{serviceId}}",
+  "therapistId": "{{therapistId}}",
+  "date": "2026-08-12",
+  "timeSlot": "11:00",
+  "visitType": "clinic"
+}
+
+### Save appointment ID
+@appointmentId = {{bookAppointment.response.body.appointment._id}}
+
+### 8. Initiate Payment (As Patient)
+# @name initiatePayment
+POST {{baseUrl}}/payments
+Authorization: Bearer {{patientToken}}
+Content-Type: application/json
+
+{
+  "appointmentId": "{{appointmentId}}"
+}
+
+### Save order ID
+@orderId = {{initiatePayment.response.body.orderId}}
+
+### 9. Verify Razorpay Payment (As Patient)
+POST {{baseUrl}}/payments/verify
+Content-Type: application/json
+
+{
+  "razorpayOrderId": "{{orderId}}",
+  "razorpayPaymentId": "pay_sandbox_12345",
+  "razorpaySignature": "sandbox_sig"
+}
+
+### 10. Fetch Admin Dashboard Stats (As Admin)
+GET {{baseUrl}}/dashboard
+Authorization: Bearer {{adminToken}}
+
+### 11. Generate Revenue Report (As Admin)
+GET {{baseUrl}}/reports?type=revenue
+Authorization: Bearer {{adminToken}}
+
+### 12. Fetch Patient Notifications (As Patient)
+# @name fetchNotifications
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{patientToken}}
+
+### 13. Mark Notification as Read (As Patient)
+# Note: You can retrieve dynamic notificationId from step 12
+PUT {{baseUrl}}/notifications/{{notificationId}}
+Authorization: Bearer {{patientToken}}
