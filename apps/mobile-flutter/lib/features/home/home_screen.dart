@@ -15,6 +15,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _apiService = ApiService();
   List<dynamic> _appointments = [];
+  List<dynamic> _services = [];
   bool _isLoading = true;
 
   // PageView state fields
@@ -36,15 +37,257 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _fetchDashboardData() async {
     try {
       final apptsRes = await _apiService.get('/appointments');
+      final servicesRes = await _apiService.get('/services');
       
       setState(() {
         _appointments = apptsRes.data['appointments'] ?? [];
+        _services = servicesRes.data['services'] ?? [];
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
       print('Error fetching dashboard data: $e');
     }
+  }
+
+  void _showServiceDetail(dynamic service) {
+    final hasImage = service['images'] != null && (service['images'] as List).isNotEmpty;
+    final imageUrl = hasImage ? service['images'][0] as String : 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=300&auto=format&fit=crop';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  width: 48,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Image Header
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.network(
+                    imageUrl,
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 180,
+                      color: const Color(0xFFF1F5F9),
+                      child: const Icon(Icons.accessibility_new_rounded, color: Color(0xFF0F766E), size: 48),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Title and Category
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (service['category'] as String).toUpperCase(),
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFF0F766E), letterSpacing: 1),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            service['title'],
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: () => Navigator.pop(context),
+                    )
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Description
+                      const Text(
+                        'About Treatment',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        service['description'] ?? 'No description available for this service.',
+                        style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.5),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Duration & Pricing
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Duration', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.access_time_rounded, size: 14, color: Color(0xFF0F766E)),
+                                      const SizedBox(width: 4),
+                                      Text('${service['duration']} mins', style: const TextStyle(color: Color(0xFF0F172A), fontSize: 14, fontWeight: FontWeight.bold)),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Visit Types', style: TextStyle(color: Color(0xFF64748B), fontSize: 11, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.location_on_rounded, size: 14, color: Color(0xFF0F766E)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        (service['clinicVisitAvailable'] == true && service['homeVisitAvailable'] == true)
+                                            ? 'Clinic & Home'
+                                            : service['clinicVisitAvailable'] == true
+                                                ? 'Clinic Only'
+                                                : 'Home Visit Only',
+                                        style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                    ],
+                                  )
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Pricing Details Card
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Pricing Options', style: TextStyle(color: Color(0xFF3B82F6), fontSize: 12, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 10),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: const [
+                                    Icon(Icons.business_rounded, size: 16, color: Color(0xFF3B82F6)),
+                                    SizedBox(width: 6),
+                                    Text('Clinic Consultation', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E3A8A))),
+                                  ],
+                                ),
+                                Text(
+                                  service['clinicVisitAvailable'] == true ? '₹${service['pricingClinic']}' : 'Not Available',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+                                ),
+                              ],
+                            ),
+                            const Divider(height: 20, color: Color(0xFFDBEAFE)),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: const [
+                                    Icon(Icons.home_rounded, size: 16, color: Color(0xFF10B981)),
+                                    SizedBox(width: 6),
+                                    Text('Home Visit Session', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF064E3B))),
+                                  ],
+                                ),
+                                Text(
+                                  service['homeVisitAvailable'] == true ? '₹${service['pricingHome']}' : 'Not Available',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF064E3B)),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Action Button
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          context.push('/booking');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F766E),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 56),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: const Text('Book Appointment Now', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildQuickActionCard({
@@ -403,6 +646,142 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 28),
+
+                    // Services Grid Section
+                    const Text(
+                      'Physiotherapy Services',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 12),
+                    if (_services.isEmpty)
+                      const Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24.0),
+                          child: Text('No active services available.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                        ),
+                      )
+                    else
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _services.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: 0.76,
+                        ),
+                        itemBuilder: (context, index) {
+                          final service = _services[index];
+                          final hasImage = service['images'] != null && (service['images'] as List).isNotEmpty;
+                          final imageUrl = hasImage ? service['images'][0] as String : 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=200&auto=format&fit=crop';
+                          final price = service['clinicVisitAvailable'] == true
+                              ? service['pricingClinic']
+                              : service['pricingHome'] ?? 0;
+
+                          return GestureDetector(
+                            onTap: () => _showServiceDetail(service),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.015),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 4),
+                                  )
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Image
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                                    child: Image.network(
+                                      imageUrl,
+                                      height: 100,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        height: 100,
+                                        color: const Color(0xFFF1F5F9),
+                                        child: const Icon(Icons.accessibility_new_rounded, color: Color(0xFF0F766E), size: 36),
+                                      ),
+                                    ),
+                                  ),
+                                  
+                                  Padding(
+                                    padding: const EdgeInsets.all(10.0),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          (service['category'] as String).toUpperCase(),
+                                          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w900, color: Color(0xFF0F766E), letterSpacing: 0.8),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          service['title'],
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.access_time_rounded, size: 11, color: Color(0xFF64748B)),
+                                                const SizedBox(width: 2),
+                                                Text('${service['duration']} mins', style: const TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w500)),
+                                              ],
+                                            ),
+                                            Text(
+                                              '₹$price',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Color(0xFF0F766E)),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 6),
+                                        
+                                        // Availability Badges
+                                        Row(
+                                          children: [
+                                            if (service['clinicVisitAvailable'] == true)
+                                              Container(
+                                                margin: const EdgeInsets.only(right: 4),
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEFF6FF),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text('Clinic', style: TextStyle(fontSize: 8, color: Color(0xFF3B82F6), fontWeight: FontWeight.bold)),
+                                              ),
+                                            if (service['homeVisitAvailable'] == true)
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFECFDF5),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: const Text('Home', style: TextStyle(fontSize: 8, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
+                                              ),
+                                          ],
+                                        )
+                                      ],
+                                    ),
+                                  )
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                     const SizedBox(height: 28),
 
                     // Upcoming Appointment Section
