@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -23,7 +25,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
         'Repeat 15 times.'
       ],
       'reps': '15',
-      'sets': '3'
+      'sets': '3',
+      'durationSec': 45 // estimated duration
     },
     {
       'title': 'Knee to Chest Stretch',
@@ -36,7 +39,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
         'Hold stretch for 30 seconds, then alternate legs.'
       ],
       'reps': '30s',
-      'sets': '3'
+      'sets': '3',
+      'durationSec': 30
     },
     {
       'title': 'Cat Cow Stretch',
@@ -49,7 +53,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
         'Repeat slow and controlled.'
       ],
       'reps': '15',
-      'sets': '3'
+      'sets': '3',
+      'durationSec': 45
     },
     {
       'title': 'Bridge Exercise',
@@ -62,7 +67,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
         'Lower slowly and repeat.'
       ],
       'reps': '15',
-      'sets': '3'
+      'sets': '3',
+      'durationSec': 45
     },
     {
       'title': 'Hamstring Stretch',
@@ -74,7 +80,8 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
         'Hold for 30 seconds, then release and repeat with the other leg.'
       ],
       'reps': '30s',
-      'sets': '3'
+      'sets': '3',
+      'durationSec': 30
     }
   ];
 
@@ -91,6 +98,32 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
   }
 
   int get _completedCount => _exercises.where((e) => e['completed'] == true).length;
+
+  void _startGuidedWorkout(Map<String, dynamic> exercise) {
+    Navigator.pop(context); // Close bottom sheet
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.9),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return GuidedTimerOverlay(
+          exercise: exercise,
+          onWorkoutFinished: () {
+            setState(() {
+              exercise['completed'] = true;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Awesome! You completed ${exercise['title']}!'),
+                backgroundColor: const Color(0xFF10B981),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   void _showExerciseDetail(Map<String, dynamic> exercise) {
     showModalBottomSheet(
@@ -149,7 +182,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Large Mock Video Player Widget (Screen 6 Layout)
+                          // Large Mock Video Player Widget
                           Container(
                             height: 220,
                             decoration: BoxDecoration(
@@ -254,25 +287,38 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                           ),
                           const SizedBox(height: 36),
 
-                          ElevatedButton(
+                          // Prominent start guided workout button
+                          ElevatedButton.icon(
+                            onPressed: () => _startGuidedWorkout(exercise),
+                            icon: const Icon(Icons.flash_on_rounded, color: Colors.white, size: 20),
+                            label: const Text('Start Guided Session', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0F766E),
+                              foregroundColor: Colors.white,
+                              minimumSize: const Size(double.infinity, 58),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+
+                          OutlinedButton(
                             onPressed: () {
                               setModalState(() {
                                 exercise['completed'] = !exercise['completed'];
                               });
-                              // update outer state
                               setState(() {});
                               Navigator.pop(context);
                             },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: exercise['completed'] ? const Color(0xFF64748B) : const Color(0xFF0F766E),
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(double.infinity, 56),
-                              elevation: 0,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: exercise['completed'] ? Colors.red : const Color(0xFF0F766E),
+                              minimumSize: const Size(double.infinity, 52),
+                              side: BorderSide(color: exercise['completed'] ? Colors.red.shade200 : const Color(0xFFE2E8F0)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                             child: Text(
                               exercise['completed'] ? 'Mark as Incomplete' : 'Mark as Completed',
-                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                             ),
                           ),
                           const SizedBox(height: 32),
@@ -330,7 +376,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Completion status block (Screen 5 Layout)
+                        // Completion status block
                         Container(
                           padding: const EdgeInsets.all(18),
                           decoration: BoxDecoration(
@@ -430,7 +476,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                     ),
                   ),
 
-                  // Tab 2: All Exercises (Simulated Placeholder)
+                  // Tab 2: All Exercises
                   const Center(
                     child: Text('Search and browse all 50+ therapy exercises.', style: TextStyle(color: Color(0xFF64748B))),
                   ),
@@ -442,4 +488,341 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
       ),
     );
   }
+}
+
+// Stateful Guided Timer Overlay that handles countdowns & renders Custom Confetti
+class GuidedTimerOverlay extends StatefulWidget {
+  final Map<String, dynamic> exercise;
+  final VoidCallback onWorkoutFinished;
+
+  const GuidedTimerOverlay({
+    super.key,
+    required this.exercise,
+    required this.onWorkoutFinished,
+  });
+
+  @override
+  State<GuidedTimerOverlay> createState() => _GuidedTimerOverlayState();
+}
+
+class _GuidedTimerOverlayState extends State<GuidedTimerOverlay> with SingleTickerProviderStateMixin {
+  late int _timeLeft;
+  bool _isPlaying = true;
+  Timer? _timer;
+  late final int _totalDuration;
+  
+  // Confetti fields
+  final List<_ConfettiParticle> _particles = [];
+  bool _isFinished = false;
+  late AnimationController _animationController;
+  final Random _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _totalDuration = widget.exercise['durationSec'] ?? 30;
+    _timeLeft = _totalDuration;
+    _startTimer();
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 4),
+    )..addListener(() {
+        if (_isFinished) {
+          _updateParticles();
+        }
+      });
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!_isPlaying) return;
+      
+      setState(() {
+        if (_timeLeft > 1) {
+          _timeLeft--;
+        } else {
+          _timeLeft = 0;
+          _timer?.cancel();
+          _triggerFinish();
+        }
+      });
+    });
+  }
+
+  void _triggerFinish() {
+    setState(() {
+      _isFinished = true;
+    });
+    
+    // Spawn 100 confetti particles
+    for (int i = 0; i < 120; i++) {
+      _particles.add(
+        _ConfettiParticle(
+          x: _random.nextDouble() * 360,
+          y: -10.0 - _random.nextDouble() * 150,
+          size: 6.0 + _random.nextDouble() * 6,
+          color: Colors.primaries[_random.nextInt(Colors.primaries.length)],
+          speed: 150.0 + _random.nextDouble() * 200,
+          angle: pi / 2 + (_random.nextDouble() - 0.5) * 0.5,
+          rotationSpeed: (_random.nextDouble() - 0.5) * 8,
+          rotation: _random.nextDouble() * 2 * pi,
+        ),
+      );
+    }
+    
+    _animationController.forward().then((value) {
+      widget.onWorkoutFinished();
+      Navigator.pop(context);
+    });
+  }
+
+  void _updateParticles() {
+    setState(() {
+      for (final p in _particles) {
+        // Gravity physics update
+        p.y += p.speed * 0.016; // 60fps step approx
+        p.x += sin(p.y * 0.05) * 0.6; // swing back & forth
+        p.rotation += p.rotationSpeed * 0.016;
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _timeLeft / _totalDuration;
+    
+    return Scaffold(
+      backgroundColor: Colors.black.withOpacity(0.9),
+      body: Stack(
+        children: [
+          // Screen UI content
+          SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.white70, size: 28),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    Text(
+                      widget.exercise['title'],
+                      style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(width: 48),
+                  ],
+                ),
+                const Spacer(),
+
+                // Stylized visual form display
+                Container(
+                  height: 180,
+                  width: 180,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.04),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: _isPlaying && !_isFinished
+                        ? const CircularPulseWave()
+                        : const Icon(Icons.accessibility_new_rounded, size: 80, color: Color(0xFF0D9488)),
+                  ),
+                ),
+                const SizedBox(height: 60),
+
+                // Timer Circular Progress indicator
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    SizedBox(
+                      width: 160,
+                      height: 160,
+                      child: CircularProgressIndicator(
+                        value: progress,
+                        strokeWidth: 10,
+                        backgroundColor: Colors.white10,
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0D9488)),
+                      ),
+                    ),
+                    Column(
+                      children: [
+                        Text(
+                          '$_timeLeft',
+                          style: const TextStyle(fontSize: 48, fontWeight: FontWeight.w800, color: Colors.white),
+                        ),
+                        const Text(
+                          'seconds left',
+                          style: TextStyle(color: Colors.white54, fontSize: 13, fontWeight: FontWeight.w500),
+                        )
+                      ],
+                    )
+                  ],
+                ),
+                const Spacer(),
+
+                // Playback Control buttons
+                if (!_isFinished) ...[
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isPlaying = !_isPlaying;
+                          });
+                        },
+                        child: CircleAvatar(
+                          radius: 36,
+                          backgroundColor: const Color(0xFF0F766E),
+                          child: Icon(
+                            _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                            size: 36,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _triggerFinish,
+                    child: const Text('Skip to Complete', style: TextStyle(color: Color(0xFF0D9488), fontWeight: FontWeight.bold, fontSize: 14)),
+                  ),
+                ] else ...[
+                  const Text(
+                    'COMPLETED!',
+                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFF10B981), letterSpacing: 2),
+                  )
+                ],
+                const SizedBox(height: 48),
+              ],
+            ),
+          ),
+
+          // Custom Confetti canvas drawn overlay
+          if (_isFinished)
+            IgnorePointer(
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: _ConfettiPainter(particles: _particles),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// A simple wave pulse widget shown during active work
+class CircularPulseWave extends StatefulWidget {
+  const CircularPulseWave({super.key});
+
+  @override
+  State<CircularPulseWave> createState() => _CircularPulseWaveState();
+}
+
+class _CircularPulseWaveState extends State<CircularPulseWave> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 80 + (80 * _controller.value),
+              height: 80 + (80 * _controller.value),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: const Color(0xFF0D9488).withOpacity(0.2 * (1 - _controller.value)),
+              ),
+            ),
+            const Icon(Icons.directions_run_rounded, size: 64, color: Color(0xFF0D9488)),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// Particle representation
+class _ConfettiParticle {
+  double x;
+  double y;
+  double size;
+  Color color;
+  double speed;
+  double angle;
+  double rotationSpeed;
+  double rotation;
+
+  _ConfettiParticle({
+    required this.x,
+    required this.y,
+    required this.size,
+    required this.color,
+    required this.speed,
+    required this.angle,
+    required this.rotationSpeed,
+    required this.rotation,
+  });
+}
+
+// Confetti painter
+class _ConfettiPainter extends CustomPainter {
+  final List<_ConfettiParticle> particles;
+
+  _ConfettiPainter({required this.particles});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final paint = Paint()
+        ..color = p.color
+        ..style = PaintingStyle.fill;
+        
+      canvas.save();
+      canvas.translate(p.x, p.y);
+      canvas.rotate(p.rotation);
+      
+      // Draw rectangular confetti piece
+      canvas.drawRect(
+        Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6),
+        paint,
+      );
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

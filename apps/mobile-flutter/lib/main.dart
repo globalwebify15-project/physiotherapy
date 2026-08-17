@@ -11,6 +11,10 @@ import 'features/exercises/exercises_screen.dart';
 import 'features/pain_tracker/pain_tracker_screen.dart';
 import 'features/home/consult_online_screen.dart';
 import 'features/home/profile_screen.dart';
+import 'features/settings/settings_screen.dart';
+
+
+
 
 void main() {
   runApp(
@@ -71,6 +75,10 @@ class PhysioApp extends StatelessWidget {
         GoRoute(
           path: '/profile',
           builder: (context, state) => const ProfileScreen(),
+        ),
+        GoRoute(
+          path: '/settings',
+          builder: (context, state) => const SettingsScreen(),
         ),
       ],
     );
