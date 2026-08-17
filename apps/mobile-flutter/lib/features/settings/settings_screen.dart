@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'theme_provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  bool _darkMode = false;
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _voiceGuidance = true;
   bool _beepSounds = true;
   bool _hapticFeedback = true;
@@ -41,12 +42,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         _reminderTime = picked;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Exercise reminder scheduled for ${_reminderTime.format(context)}'),
-          backgroundColor: const Color(0xFF0F766E),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Exercise reminder scheduled for ${_reminderTime.format(context)}'),
+            backgroundColor: const Color(0xFF0F766E),
+          ),
+        );
+      }
     }
   }
 
@@ -168,6 +171,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = ref.watch(themeModeProvider) == ThemeMode.dark;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -188,9 +193,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildSwitchTile(
                 title: 'Dark Mode',
                 subtitle: 'Use a darker visual palette',
-                value: _darkMode,
+                value: isDarkMode,
                 icon: Icons.dark_mode_rounded,
-                onChanged: (val) => setState(() => _darkMode = val),
+                onChanged: (val) {
+                  ref.read(themeModeProvider.notifier).state = val ? ThemeMode.dark : ThemeMode.light;
+                },
               ),
 
               _buildSectionHeader('Reminders & Alerts'),

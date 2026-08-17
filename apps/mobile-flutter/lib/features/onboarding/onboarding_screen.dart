@@ -53,7 +53,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           height: 240,
                           width: double.infinity,
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEEF2FF),
+                            color: const Color(0xFFE0F2F1), // Light green-teal shade
                             borderRadius: BorderRadius.circular(32),
                           ),
                           child: Stack(
@@ -66,7 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   width: 60,
                                   height: 60,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFFC7D2FE),
+                                    color: Color(0xFFB2DFDB), // Soft teal shade
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -78,7 +78,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   width: 90,
                                   height: 90,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFFE0E7FF),
+                                    color: Color(0xFFE0F2F1), // Light teal shade
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -90,7 +90,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                         ? Icons.group_add_rounded
                                         : Icons.task_alt_rounded,
                                 size: 100,
-                                color: const Color(0xFF4F46E5),
+                                color: const Color(0xFF0F766E), // Premium dark teal/green
                               ),
                             ],
                           ),
@@ -135,7 +135,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: _currentPage == index ? 24 : 8,
                   decoration: BoxDecoration(
                     color: _currentPage == index
-                        ? const Color(0xFF4F46E5)
+                        ? const Color(0xFF0F766E) // Teal/green instead of blue
                         : const Color(0xFFCBD5E1),
                     borderRadius: BorderRadius.circular(4),
                   ),
@@ -153,7 +153,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ElevatedButton(
                     onPressed: () => context.go('/login'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4F46E5),
+                      backgroundColor: const Color(0xFF0F766E), // Premium green instead of blue
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       elevation: 0,
@@ -170,7 +170,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   TextButton(
                     onPressed: () => context.go('/login'),
                     style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF4F46E5),
+                      foregroundColor: const Color(0xFF0F766E), // Green link text
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     child: const Text(

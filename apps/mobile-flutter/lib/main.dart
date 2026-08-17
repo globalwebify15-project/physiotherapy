@@ -12,9 +12,7 @@ import 'features/pain_tracker/pain_tracker_screen.dart';
 import 'features/home/consult_online_screen.dart';
 import 'features/home/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
-
-
-
+import 'features/settings/theme_provider.dart';
 
 void main() {
   runApp(
@@ -24,12 +22,13 @@ void main() {
   );
 }
 
-class PhysioApp extends StatelessWidget {
+class PhysioApp extends ConsumerWidget {
   const PhysioApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // GoRouter navigation map configuration
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themeMode = ref.watch(themeModeProvider);
+
     final GoRouter router = GoRouter(
       initialLocation: '/',
       routes: [
@@ -87,13 +86,13 @@ class PhysioApp extends StatelessWidget {
       title: 'PhysioCare',
       debugShowCheckedModeBanner: false,
       routerConfig: router,
+      themeMode: themeMode,
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Outfit',
-        // Premium HSL-inspired palette mapping
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4F46E5), // Indigo Accent
-          primary: const Color(0xFF4F46E5),
+          seedColor: const Color(0xFF0F766E), // Teal Accent
+          primary: const Color(0xFF0F766E),
           secondary: const Color(0xFF10B981), // Emerald Accent
           surface: Colors.white,
           background: const Color(0xFFF8FAFC),
@@ -108,6 +107,33 @@ class PhysioApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: const Color(0xFFF1F5F9),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        fontFamily: 'Outfit',
+        brightness: Brightness.dark,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF0F766E),
+          primary: const Color(0xFF0F766E),
+          secondary: const Color(0xFF10B981),
+          brightness: Brightness.dark,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.grey.shade800, width: 1),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF1E293B),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
