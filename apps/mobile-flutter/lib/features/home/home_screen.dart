@@ -1,19 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
+import '../exercises/exercises_provider.dart';
+import 'recovery_trend_chart.dart';
 
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _apiService = ApiService();
-  List<dynamic> _services = [];
   List<dynamic> _appointments = [];
   bool _isLoading = true;
+
+  // PageView state fields
+  final PageController _pageController = PageController();
+  int _activePage = 0;
 
   @override
   void initState() {
@@ -21,13 +27,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchDashboardData();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchDashboardData() async {
     try {
-      final servicesRes = await _apiService.get('/services');
       final apptsRes = await _apiService.get('/appointments');
       
       setState(() {
-        _services = servicesRes.data['services'] ?? [];
         _appointments = apptsRes.data['appointments'] ?? [];
         _isLoading = false;
       });
@@ -88,6 +98,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch dynamic Riverpod exercises list
+    final exercisesList = ref.watch(exercisesProvider);
+    final completedCount = exercisesList.where((e) => e.completed).length;
+    final totalCount = exercisesList.length;
+    final progress = totalCount == 0 ? 0.0 : (completedCount / totalCount);
+
     // Find first upcoming/active appointment
     final upcomingAppt = _appointments.firstWhere(
       (a) => a['status'] == 'confirmed' || a['status'] == 'assigned' || a['status'] == 'pending',
@@ -113,7 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF4F46E5)))
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFF0F766E)))
           : RefreshIndicator(
               onRefresh: _fetchDashboardData,
               child: SingleChildScrollView(
@@ -134,70 +150,218 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Today's Plan card (Screen 3)
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF0D9488), Color(0xFF0F766E)], // Deep teal gradient
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF0F766E).withOpacity(0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          )
-                        ],
-                      ),
-                      child: Row(
+                    // swipable horizontal cards slider
+                    SizedBox(
+                      height: 200,
+                      child: PageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _activePage = index;
+                          });
+                        },
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  "Today's Plan",
-                                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  "2 / 5 Exercises Completed",
-                                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
-                                ),
-                                const SizedBox(height: 12),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4),
-                                  child: const LinearProgressIndicator(
-                                    value: 0.4,
-                                    backgroundColor: Colors.white24,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                    minHeight: 6,
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: () => context.push('/exercises'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    foregroundColor: const Color(0xFF0F766E),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    elevation: 0,
-                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  ),
-                                  child: const Text('Continue Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                          // Slide 1: Workout Plan Progress Card
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF0D9488), Color(0xFF0F766E)], // Deep teal gradient
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF0F766E).withOpacity(0.25),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
                                 )
                               ],
                             ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        "Today's Plan",
+                                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        "$completedCount / $totalCount Exercises Completed",
+                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: progress,
+                                          backgroundColor: Colors.white24,
+                                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                                          minHeight: 6,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      ElevatedButton(
+                                        onPressed: () => context.push('/exercises'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: const Color(0xFF0F766E),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        ),
+                                        child: const Text('Continue Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                const Icon(Icons.fitness_center_rounded, size: 72, color: Colors.white24),
+                              ],
+                            ),
                           ),
-                          const SizedBox(width: 16),
-                          const Icon(Icons.fitness_center_rounded, size: 72, color: Colors.white24),
+
+                          // Slide 2: Daily Health Tips Card
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF4F46E5), Color(0xFF3730A3)], // Deep indigo gradient
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF4F46E5).withOpacity(0.25),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
+                                )
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        "Tip of the Day",
+                                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      const Text(
+                                        "Stretching every 45 minutes reduces joint stiffness and pain.",
+                                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      ElevatedButton(
+                                        onPressed: () {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Focus on lower-back and hamstring stretches today!')),
+                                          );
+                                        },
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: const Color(0xFF4F46E5),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        ),
+                                        child: const Text('Read More', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                const Icon(Icons.lightbulb_rounded, size: 72, color: Colors.white24),
+                              ],
+                            ),
+                          ),
+
+                          // Slide 3: Wellness Promotions / Offer Card
+                          Container(
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFD946EF), Color(0xFF86198F)], // Vibrant pink gradient
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFD946EF).withOpacity(0.25),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 8),
+                                )
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        "Special Offer",
+                                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        "Get 20% off on your first home visit consultation.",
+                                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
+                                      ),
+                                      const SizedBox(height: 14),
+                                      ElevatedButton(
+                                        onPressed: () => context.push('/booking'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor: const Color(0xFF86198F),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          elevation: 0,
+                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                        ),
+                                        child: const Text('Claim Offer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                      )
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                const Icon(Icons.local_offer_rounded, size: 72, color: Colors.white24),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 12),
+
+                    // Dots indicator row
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(3, (index) {
+                        final isSelected = _activePage == index;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: 7,
+                          width: isSelected ? 18 : 7,
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFCBD5E1),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Quick Actions Section
                     const Text(
@@ -304,7 +468,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       )
                     else
-                      // Default mock card matching Screen 3 if no live DB entries
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -349,6 +512,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                       ),
+                    
+                    const SizedBox(height: 28),
+
+                    // Embedded Recovery Analytics Trend Chart
+                    const RecoveryTrendChart(),
+
                     const SizedBox(height: 32),
                   ],
                 ),

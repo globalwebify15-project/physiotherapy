@@ -1,89 +1,19 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'exercises_provider.dart';
 
-class ExercisesScreen extends StatefulWidget {
+class ExercisesScreen extends ConsumerStatefulWidget {
   const ExercisesScreen({super.key});
 
   @override
-  State<ExercisesScreen> createState() => _ExercisesScreenState();
+  ConsumerState<ExercisesScreen> createState() => _ExercisesScreenState();
 }
 
-class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProviderStateMixin {
+class _ExercisesScreenState extends ConsumerState<ExercisesScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-
-  final List<Map<String, dynamic>> _exercises = [
-    {
-      'title': 'Pelvic Tilt',
-      'sub': '3 sets x 15 reps',
-      'completed': true,
-      'steps': [
-        'Lie on your back with knees bent and feet flat on the floor.',
-        'Flatten your lower back against the floor by tightening your abdominal muscles.',
-        'Hold for 5 seconds, then relax.',
-        'Repeat 15 times.'
-      ],
-      'reps': '15',
-      'sets': '3',
-      'durationSec': 45 // estimated duration
-    },
-    {
-      'title': 'Knee to Chest Stretch',
-      'sub': '3 sets x 30 sec',
-      'completed': true,
-      'steps': [
-        'Lie flat on your back with legs straight.',
-        'Pull one knee up towards your chest, clasping your hands behind your thigh.',
-        'Keep the other leg flat on the floor.',
-        'Hold stretch for 30 seconds, then alternate legs.'
-      ],
-      'reps': '30s',
-      'sets': '3',
-      'durationSec': 30
-    },
-    {
-      'title': 'Cat Cow Stretch',
-      'sub': '3 sets x 15 reps',
-      'completed': false,
-      'steps': [
-        'Start on your hands and knees in a tabletop position.',
-        'Inhale, drop your belly towards the floor and look up (Cow).',
-        'Exhale, arch your spine and tuck your chin towards your chest (Cat).',
-        'Repeat slow and controlled.'
-      ],
-      'reps': '15',
-      'sets': '3',
-      'durationSec': 45
-    },
-    {
-      'title': 'Bridge Exercise',
-      'sub': '3 sets x 15 reps',
-      'completed': false,
-      'steps': [
-        'Lie on your back with knees bent and feet flat on the floor.',
-        'Lift your hips off the floor until your knees, hips, and shoulders form a straight line.',
-        'Squeeze your glutes and hold for 2 seconds.',
-        'Lower slowly and repeat.'
-      ],
-      'reps': '15',
-      'sets': '3',
-      'durationSec': 45
-    },
-    {
-      'title': 'Hamstring Stretch',
-      'sub': '3 sets x 30 sec',
-      'completed': false,
-      'steps': [
-        'Lie on your back and loop a towel/strap around the ball of one foot.',
-        'Gently pull the strap to raise your leg, keeping your knee slightly straight.',
-        'Hold for 30 seconds, then release and repeat with the other leg.'
-      ],
-      'reps': '30s',
-      'sets': '3',
-      'durationSec': 30
-    }
-  ];
 
   @override
   void initState() {
@@ -97,9 +27,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
     super.dispose();
   }
 
-  int get _completedCount => _exercises.where((e) => e['completed'] == true).length;
-
-  void _startGuidedWorkout(Map<String, dynamic> exercise) {
+  void _startGuidedWorkout(ExerciseItem exercise) {
     Navigator.pop(context); // Close bottom sheet
     showGeneralDialog(
       context: context,
@@ -110,29 +38,25 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
         return GuidedTimerOverlay(
           exercise: exercise,
           onWorkoutFinished: () {
-            setState(() {
-              exercise['completed'] = true;
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Awesome! You completed ${exercise['title']}!'),
-                backgroundColor: const Color(0xFF10B981),
-              ),
-            );
+            ref.read(exercisesProvider.notifier).markCompleted(exercise.title, true);
           },
         );
       },
     );
   }
 
-  void _showExerciseDetail(Map<String, dynamic> exercise) {
+  void _showExerciseDetail(ExerciseItem exercise) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
+        return Consumer(
+          builder: (context, ref, child) {
+            // Re-watch exercises list to get live completed state in sheet
+            final currentList = ref.watch(exercisesProvider);
+            final liveExercise = currentList.firstWhere((e) => e.title == exercise.title);
+
             return Container(
               height: MediaQuery.of(context).size.height * 0.88,
               decoration: const BoxDecoration(
@@ -163,7 +87,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                       children: [
                         Expanded(
                           child: Text(
-                            exercise['title'],
+                            liveExercise.title,
                             style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
                         ),
@@ -217,7 +141,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17, color: Color(0xFF0F172A)),
                           ),
                           const SizedBox(height: 12),
-                          ...List.generate(exercise['steps'].length, (index) {
+                          ...List.generate(liveExercise.steps.length, (index) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 10.0),
                               child: Row(
@@ -235,7 +159,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      exercise['steps'][index],
+                                      liveExercise.steps[index],
                                       style: const TextStyle(fontSize: 14, color: Color(0xFF64748B), height: 1.4),
                                     ),
                                   ),
@@ -260,7 +184,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                     children: [
                                       const Text('Reps / Time', style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 6),
-                                      Text(exercise['reps'], style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w800)),
+                                      Text(liveExercise.reps, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w800)),
                                     ],
                                   ),
                                 ),
@@ -278,7 +202,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                     children: [
                                       const Text('Sets', style: TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.bold)),
                                       const SizedBox(height: 6),
-                                      Text(exercise['sets'], style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w800)),
+                                      Text(liveExercise.sets, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 22, fontWeight: FontWeight.w800)),
                                     ],
                                   ),
                                 ),
@@ -289,7 +213,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
 
                           // Prominent start guided workout button
                           ElevatedButton.icon(
-                            onPressed: () => _startGuidedWorkout(exercise),
+                            onPressed: () => _startGuidedWorkout(liveExercise),
                             icon: const Icon(Icons.flash_on_rounded, color: Colors.white, size: 20),
                             label: const Text('Start Guided Session', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                             style: ElevatedButton.styleFrom(
@@ -304,20 +228,17 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
 
                           OutlinedButton(
                             onPressed: () {
-                              setModalState(() {
-                                exercise['completed'] = !exercise['completed'];
-                              });
-                              setState(() {});
+                              ref.read(exercisesProvider.notifier).toggleCompleted(liveExercise.title);
                               Navigator.pop(context);
                             },
                             style: OutlinedButton.styleFrom(
-                              foregroundColor: exercise['completed'] ? Colors.red : const Color(0xFF0F766E),
+                              foregroundColor: liveExercise.completed ? Colors.red : const Color(0xFF0F766E),
                               minimumSize: const Size(double.infinity, 52),
-                              side: BorderSide(color: exercise['completed'] ? Colors.red.shade200 : const Color(0xFFE2E8F0)),
+                              side: BorderSide(color: liveExercise.completed ? Colors.red.shade200 : const Color(0xFFE2E8F0)),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                             ),
                             child: Text(
-                              exercise['completed'] ? 'Mark as Incomplete' : 'Mark as Completed',
+                              liveExercise.completed ? 'Mark as Incomplete' : 'Mark as Completed',
                               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -337,6 +258,9 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
 
   @override
   Widget build(BuildContext context) {
+    final exercisesList = ref.watch(exercisesProvider);
+    final completedCount = exercisesList.where((e) => e.completed).length;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -399,7 +323,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                 ],
                               ),
                               Text(
-                                '$_completedCount / ${_exercises.length} Completed',
+                                '$completedCount / ${exercisesList.length} Completed',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF166534)),
                               )
                             ],
@@ -411,10 +335,10 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                         ListView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _exercises.length,
+                          itemCount: exercisesList.length,
                           itemBuilder: (context, index) {
-                            final ex = _exercises[index];
-                            final isCompleted = ex['completed'] == true;
+                            final ex = exercisesList[index];
+                            final isCompleted = ex.completed;
 
                             return Card(
                               elevation: 0,
@@ -439,7 +363,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                   ),
                                 ),
                                 title: Text(
-                                  ex['title'],
+                                  ex.title,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold, 
                                     fontSize: 15,
@@ -448,7 +372,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                   ),
                                 ),
                                 subtitle: Text(
-                                  ex['sub'],
+                                  ex.sub,
                                   style: TextStyle(
                                     fontSize: 12, 
                                     color: isCompleted ? const Color(0xFF94A3B8) : const Color(0xFF64748B)
@@ -456,9 +380,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
                                 ),
                                 trailing: GestureDetector(
                                   onTap: () {
-                                    setState(() {
-                                      ex['completed'] = !ex['completed'];
-                                    });
+                                    ref.read(exercisesProvider.notifier).toggleCompleted(ex.title);
                                   },
                                   child: Icon(
                                     isCompleted ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
@@ -492,7 +414,7 @@ class _ExercisesScreenState extends State<ExercisesScreen> with SingleTickerProv
 
 // Stateful Guided Timer Overlay that handles countdowns & renders Custom Confetti
 class GuidedTimerOverlay extends StatefulWidget {
-  final Map<String, dynamic> exercise;
+  final ExerciseItem exercise;
   final VoidCallback onWorkoutFinished;
 
   const GuidedTimerOverlay({
@@ -520,7 +442,7 @@ class _GuidedTimerOverlayState extends State<GuidedTimerOverlay> with SingleTick
   @override
   void initState() {
     super.initState();
-    _totalDuration = widget.exercise['durationSec'] ?? 30;
+    _totalDuration = widget.exercise.durationSec;
     _timeLeft = _totalDuration;
     _startTimer();
 
@@ -617,7 +539,7 @@ class _GuidedTimerOverlayState extends State<GuidedTimerOverlay> with SingleTick
                       onPressed: () => Navigator.pop(context),
                     ),
                     Text(
-                      widget.exercise['title'],
+                      widget.exercise.title,
                       style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(width: 48),
