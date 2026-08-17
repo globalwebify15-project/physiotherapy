@@ -109,9 +109,15 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> with SingleTi
                           // Large Mock Video Player Widget
                           Container(
                             height: 220,
+                            width: double.infinity,
                             decoration: BoxDecoration(
                               color: const Color(0xFF0F172A),
                               borderRadius: BorderRadius.circular(24),
+                              image: const DecorationImage(
+                                image: NetworkImage('https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=600&q=80'),
+                                fit: BoxFit.cover,
+                                colorFilter: ColorFilter.mode(Colors.black38, BlendMode.darken),
+                              ),
                             ),
                             child: Stack(
                               alignment: Alignment.center,
@@ -127,7 +133,7 @@ class _ExercisesScreenState extends ConsumerState<ExercisesScreen> with SingleTi
                                   left: 16,
                                   child: Text(
                                     'Demo Video',
-                                    style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold, fontSize: 13),
+                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                                   ),
                                 )
                               ],

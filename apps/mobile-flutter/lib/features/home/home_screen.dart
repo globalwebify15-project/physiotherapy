@@ -630,6 +630,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               label: Text(cat),
                               selected: isSelected,
                               selectedColor: const Color(0xFF0F766E),
+                              checkmarkColor: Colors.white,
                               disabledColor: Colors.grey.shade100,
                               labelStyle: TextStyle(
                                 color: isSelected ? Colors.white : const Color(0xFF0F172A),
