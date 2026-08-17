@@ -469,10 +469,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         },
                         children: _banners.isNotEmpty
                             ? _banners.map<Widget>((banner) {
-                                final imageUrl = banner['imageUrl'] ?? 'https://images.unsplash.com/photo-1598256989800-fe5f95da9787?auto=format&fit=crop&w=1200&q=80';
+                                var imageUrl = banner['imageUrl'] ?? 'https://images.unsplash.com/photo-1598256989800-fe5f95da9787?auto=format&fit=crop&w=1200&q=80';
+                                if (imageUrl.contains('576765608866') || imageUrl.contains('1576765608866-5b5104814239')) {
+                                  imageUrl = 'https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?auto=format&fit=crop&w=1200&q=80';
+                                }
                                 return Container(
                                   padding: const EdgeInsets.all(20),
                                   decoration: BoxDecoration(
+                                    color: const Color(0xFF0F766E), // Fallback color
                                     borderRadius: BorderRadius.circular(24),
                                     image: DecorationImage(
                                       image: NetworkImage(imageUrl),

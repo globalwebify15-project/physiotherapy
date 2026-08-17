@@ -222,6 +222,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                           selected: _selectedVisitType == 'clinic',
                           selectedColor: const Color(0xFF0F766E),
+                          checkmarkColor: Colors.white,
                           labelStyle: TextStyle(color: _selectedVisitType == 'clinic' ? Colors.white : const Color(0xFF0F172A)),
                           backgroundColor: const Color(0xFFF1F5F9),
                           onSelected: (val) {
@@ -240,6 +241,7 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                           selected: _selectedVisitType == 'home',
                           selectedColor: const Color(0xFF0F766E),
+                          checkmarkColor: Colors.white,
                           labelStyle: TextStyle(color: _selectedVisitType == 'home' ? Colors.white : const Color(0xFF0F172A)),
                           backgroundColor: const Color(0xFFF1F5F9),
                           onSelected: (val) {

@@ -24,13 +24,14 @@ class RecoveryTrendChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'Recovery Analytics',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
               ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Container(
@@ -43,7 +44,7 @@ class RecoveryTrendChart extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   const Text('Pain Level', style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 16),
                   Container(
                     width: 10,
                     height: 10,

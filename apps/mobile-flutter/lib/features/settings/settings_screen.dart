@@ -171,7 +171,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = ref.watch(themeModeProvider) == ThemeMode.dark;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -189,16 +188,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionHeader('Appearance'),
-              _buildSwitchTile(
-                title: 'Dark Mode',
-                subtitle: 'Use a darker visual palette',
-                value: isDarkMode,
-                icon: Icons.dark_mode_rounded,
-                onChanged: (val) {
-                  ref.read(themeModeProvider.notifier).state = val ? ThemeMode.dark : ThemeMode.light;
-                },
-              ),
+
 
               _buildSectionHeader('Reminders & Alerts'),
               Container(
