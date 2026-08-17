@@ -13,6 +13,7 @@ import 'features/home/consult_online_screen.dart';
 import 'features/home/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/theme_provider.dart';
+import 'features/auth/register_screen.dart';
 
 void main() {
   runApp(
@@ -78,6 +79,14 @@ class PhysioApp extends ConsumerWidget {
         GoRoute(
           path: '/settings',
           builder: (context, state) => const SettingsScreen(),
+        ),
+        GoRoute(
+          path: '/register',
+          builder: (context, state) => const RegisterScreen(isEditing: false),
+        ),
+        GoRoute(
+          path: '/edit_profile',
+          builder: (context, state) => const RegisterScreen(isEditing: true),
         ),
       ],
     );

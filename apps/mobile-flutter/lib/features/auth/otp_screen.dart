@@ -39,9 +39,14 @@ class _OtpScreenState extends State<OtpScreen> {
         await _storage.write(key: 'accessToken', value: data['accessToken']);
         await _storage.write(key: 'refreshToken', value: data['refreshToken']);
         await _storage.write(key: 'patientId', value: data['patient']['id']);
+        await _storage.write(key: 'userMobile', value: widget.mobile);
 
         if (mounted) {
-          context.go('/home');
+          if (data['isNewUser'] == true) {
+            context.go('/register');
+          } else {
+            context.go('/home');
+          }
         }
       }
     } catch (e) {

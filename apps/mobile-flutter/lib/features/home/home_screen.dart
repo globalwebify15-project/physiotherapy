@@ -14,13 +14,23 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _apiService = ApiService();
-  List<dynamic> _appointments = [];
-  List<dynamic> _services = [];
   bool _isLoading = true;
 
-  // PageView state fields
+  // Dynamic Dashboard Data from API and CMS
+  String _patientName = 'Rahul';
+  List<dynamic> _appointments = [];
+  List<dynamic> _services = [];
+  
+  // CMS Collections
+  List<dynamic> _banners = [];
+  List<dynamic> _testimonials = [];
+  List<dynamic> _faqs = [];
+  Map<String, dynamic> _contactDetails = {};
+
+  // Interactive UI State
   final PageController _pageController = PageController();
   int _activePage = 0;
+  String _selectedCategory = 'All';
 
   @override
   void initState() {
@@ -36,9 +46,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _fetchDashboardData() async {
     try {
+      // 1. Fetch Patient details for name greeting
+      try {
+        final patientRes = await _apiService.get('/patients');
+        if (patientRes.statusCode == 200 && patientRes.data['patient'] != null) {
+          _patientName = patientRes.data['patient']['name'] ?? 'Guest';
+        }
+      } catch (e) {
+        print('Info: Could not load dynamic name greeting, using fallback: $e');
+      }
+
+      // 2. Fetch Appointments & Services
       final apptsRes = await _apiService.get('/appointments');
       final servicesRes = await _apiService.get('/services');
-      
+
+      // 3. Fetch CMS blocks
+      try {
+        final bannersRes = await _apiService.get('/cms?key=homepage_banners');
+        if (bannersRes.statusCode == 200 && bannersRes.data['content'] != null) {
+          _banners = bannersRes.data['content'] as List;
+        }
+      } catch (e) {
+        print('Info: Banners CMS failed, using presets: $e');
+      }
+
+      try {
+        final testRes = await _apiService.get('/cms?key=testimonials');
+        if (testRes.statusCode == 200 && testRes.data['content'] != null) {
+          _testimonials = testRes.data['content'] as List;
+        }
+      } catch (e) {
+        print('Info: Testimonials CMS failed: $e');
+      }
+
+      try {
+        final faqsRes = await _apiService.get('/cms?key=faqs');
+        if (faqsRes.statusCode == 200 && faqsRes.data['content'] != null) {
+          _faqs = faqsRes.data['content'] as List;
+        }
+      } catch (e) {
+        print('Info: FAQs CMS failed: $e');
+      }
+
+      try {
+        final contactRes = await _apiService.get('/cms?key=contact_details');
+        if (contactRes.statusCode == 200 && contactRes.data['content'] != null) {
+          _contactDetails = contactRes.data['content'] as Map<String, dynamic>;
+        }
+      } catch (e) {
+        print('Info: Contact details CMS failed: $e');
+      }
+
       setState(() {
         _appointments = apptsRes.data['appointments'] ?? [];
         _services = servicesRes.data['services'] ?? [];
@@ -118,7 +176,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           const SizedBox(height: 4),
                           Text(
                             service['title'],
-                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
                         ],
                       ),
@@ -138,10 +196,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Description
                       const Text(
                         'About Treatment',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -150,7 +207,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Duration & Pricing
                       Row(
                         children: [
                           Expanded(
@@ -213,7 +269,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Pricing Details Card
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -263,7 +318,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Action Button
                       ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
@@ -341,17 +395,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch dynamic Riverpod exercises list
     final exercisesList = ref.watch(exercisesProvider);
     final completedCount = exercisesList.where((e) => e.completed).length;
     final totalCount = exercisesList.length;
     final progress = totalCount == 0 ? 0.0 : (completedCount / totalCount);
 
-    // Find first upcoming/active appointment
     final upcomingAppt = _appointments.firstWhere(
       (a) => a['status'] == 'confirmed' || a['status'] == 'assigned' || a['status'] == 'pending',
       orElse: () => null,
     );
+
+    // Extract categories dynamically from services list
+    final List<String> categories = ['All'];
+    for (var service in _services) {
+      final cat = service['category'] as String?;
+      if (cat != null && !categories.contains(cat)) {
+        categories.add(cat);
+      }
+    }
+
+    // Filter services dynamically
+    final filteredServices = _selectedCategory == 'All'
+        ? _services
+        : _services.where((s) => s['category'] == _selectedCategory).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -381,10 +447,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Greeting Header
-                    const Text(
-                      'Hello, Rahul 👋',
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                    // Dynamic greeting name
+                    Text(
+                      'Hello, $_patientName 👋',
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                     ),
                     const SizedBox(height: 4),
                     const Text(
@@ -393,204 +459,102 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // swipable horizontal cards slider
+                    // Top Banner Slider using CMS homepage_banners
                     SizedBox(
                       height: 200,
                       child: PageView(
                         controller: _pageController,
                         onPageChanged: (index) {
-                          setState(() {
-                            _activePage = index;
-                          });
+                          setState(() => _activePage = index);
                         },
-                        children: [
-                          // Slide 1: Workout Plan Progress Card
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF0D9488), Color(0xFF0F766E)], // Deep teal gradient
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF0F766E).withOpacity(0.25),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 8),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const Text(
-                                        "Today's Plan",
-                                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        "$completedCount / $totalCount Exercises Completed",
-                                        style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: LinearProgressIndicator(
-                                          value: progress,
-                                          backgroundColor: Colors.white24,
-                                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                                          minHeight: 6,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      ElevatedButton(
-                                        onPressed: () => context.push('/exercises'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: const Color(0xFF0F766E),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          elevation: 0,
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                        ),
-                                        child: const Text('Continue Plan', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      )
-                                    ],
+                        children: _banners.isNotEmpty
+                            ? _banners.map<Widget>((banner) {
+                                final imageUrl = banner['imageUrl'] ?? 'https://images.unsplash.com/photo-1598256989800-fe5f95da9787?auto=format&fit=crop&w=1200&q=80';
+                                return Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(24),
+                                    image: DecorationImage(
+                                      image: NetworkImage(imageUrl),
+                                      fit: BoxFit.cover,
+                                      colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.55), BlendMode.darken),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                const Icon(Icons.fitness_center_rounded, size: 72, color: Colors.white24),
-                              ],
-                            ),
-                          ),
-
-                          // Slide 2: Daily Health Tips Card
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF4F46E5), Color(0xFF3730A3)], // Deep indigo gradient
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF4F46E5).withOpacity(0.25),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 8),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Text(
-                                        "Tip of the Day",
-                                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                                      Text(
+                                        banner['title'] ?? 'Restore Your Movement',
+                                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
                                       ),
                                       const SizedBox(height: 6),
-                                      const Text(
-                                        "Stretching every 45 minutes reduces joint stiffness and pain.",
-                                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
+                                      Text(
+                                        banner['subtitle'] ?? 'Expert physiotherapy care at your clinical doorstep.',
+                                        style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w500),
                                       ),
                                       const SizedBox(height: 16),
                                       ElevatedButton(
-                                        onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Focus on lower-back and hamstring stretches today!')),
-                                          );
-                                        },
+                                        onPressed: () => context.push(banner['targetRoute'] ?? '/booking'),
                                         style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: const Color(0xFF4F46E5),
+                                          backgroundColor: const Color(0xFF0F766E),
+                                          foregroundColor: Colors.white,
                                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                           elevation: 0,
                                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                                         ),
-                                        child: const Text('Read More', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                                        child: Text(banner['ctaText'] ?? 'Book Now', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                                       )
                                     ],
                                   ),
-                                ),
-                                const SizedBox(width: 16),
-                                const Icon(Icons.lightbulb_rounded, size: 72, color: Colors.white24),
-                              ],
-                            ),
-                          ),
-
-                          // Slide 3: Wellness Promotions / Offer Card
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFFD946EF), Color(0xFF86198F)], // Vibrant pink gradient
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                              ),
-                              borderRadius: BorderRadius.circular(24),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFFD946EF).withOpacity(0.25),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 8),
-                                )
-                              ],
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
+                                );
+                              }).toList()
+                            : [
+                                // Fallback Preset Slide 1
+                                Container(
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFF0D9488), Color(0xFF0F766E)],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(24),
+                                  ),
+                                  child: Row(
                                     children: [
-                                      const Text(
-                                        "Special Offer",
-                                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      const Text(
-                                        "Get 20% off on your first home visit consultation.",
-                                        style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
-                                      ),
-                                      const SizedBox(height: 14),
-                                      ElevatedButton(
-                                        onPressed: () => context.push('/booking'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: const Color(0xFF86198F),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                          elevation: 0,
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Text("Today's Plan", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                                            const SizedBox(height: 4),
+                                            Text("$completedCount / $totalCount Exercises Completed", style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                                            const SizedBox(height: 12),
+                                            LinearProgressIndicator(value: progress, backgroundColor: Colors.white24, valueColor: const AlwaysStoppedAnimation(Colors.white)),
+                                            const SizedBox(height: 16),
+                                            ElevatedButton(
+                                              onPressed: () => context.push('/exercises'),
+                                              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: const Color(0xFF0F766E)),
+                                              child: const Text('Continue Plan', style: TextStyle(fontWeight: FontWeight.bold)),
+                                            )
+                                          ],
                                         ),
-                                        child: const Text('Claim Offer', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                      )
+                                      ),
+                                      const Icon(Icons.fitness_center_rounded, size: 72, color: Colors.white24),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(width: 16),
-                                const Icon(Icons.local_offer_rounded, size: 72, color: Colors.white24),
                               ],
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                     const SizedBox(height: 12),
 
-                    // Dots indicator row
+                    // Dot Indicators
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(3, (index) {
+                      children: List.generate(_banners.isNotEmpty ? _banners.length : 1, (index) {
                         final isSelected = _activePage == index;
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 150),
@@ -606,11 +570,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Quick Actions Section
-                    const Text(
-                      'Quick Actions',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                    ),
+                    // Quick Actions
+                    const Text('Quick Actions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     const SizedBox(height: 12),
                     GridView.count(
                       crossAxisCount: 2,
@@ -623,57 +584,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         _buildQuickActionCard(
                           icon: Icons.calendar_month_rounded,
                           title: 'Book Session',
-                          color: const Color(0xFF3B82F6), // Blue
+                          color: const Color(0xFF3B82F6),
                           onTap: () => context.push('/booking'),
                         ),
                         _buildQuickActionCard(
                           icon: Icons.directions_run_rounded,
                           title: 'My Exercises',
-                          color: const Color(0xFF10B981), // Emerald
+                          color: const Color(0xFF10B981),
                           onTap: () => context.push('/exercises'),
                         ),
                         _buildQuickActionCard(
                           icon: Icons.mood_bad_rounded,
                           title: 'Pain Tracker',
-                          color: const Color(0xFFF59E0B), // Orange
+                          color: const Color(0xFFF59E0B),
                           onTap: () => context.push('/pain_tracker'),
                         ),
                         _buildQuickActionCard(
                           icon: Icons.videocam_rounded,
                           title: 'Consult Online',
-                          color: const Color(0xFF8B5CF6), // Purple
+                          color: const Color(0xFF8B5CF6),
                           onTap: () => context.push('/consult_online'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 28),
 
-                    // Services Grid Section
-                    const Text(
-                      'Physiotherapy Services',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                    ),
+                    // Categories Filter chips list (Dynamic)
+                    const Text('Explore Categories', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     const SizedBox(height: 12),
-                    if (_services.isEmpty)
+                    SizedBox(
+                      height: 40,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: categories.length,
+                        itemBuilder: (context, index) {
+                          final cat = categories[index];
+                          final isSelected = _selectedCategory == cat;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: Text(cat),
+                              selected: isSelected,
+                              selectedColor: const Color(0xFF0F766E),
+                              disabledColor: Colors.grey.shade100,
+                              labelStyle: TextStyle(
+                                color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              onSelected: (selected) {
+                                if (selected) {
+                                  setState(() => _selectedCategory = cat);
+                                }
+                              },
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Services Listing Grid
+                    const Text('Physiotherapy Services', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                    const SizedBox(height: 12),
+                    if (filteredServices.isEmpty)
                       const Center(
                         child: Padding(
                           padding: EdgeInsets.symmetric(vertical: 24.0),
-                          child: Text('No active services available.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                          child: Text('No services found in this category.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                         ),
                       )
                     else
                       GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _services.length,
+                        itemCount: filteredServices.length,
                         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2,
                           crossAxisSpacing: 12,
                           mainAxisSpacing: 12,
-                          childAspectRatio: 0.76,
+                          childAspectRatio: 0.75,
                         ),
                         itemBuilder: (context, index) {
-                          final service = _services[index];
+                          final service = filteredServices[index];
                           final hasImage = service['images'] != null && (service['images'] as List).isNotEmpty;
                           final imageUrl = hasImage ? service['images'][0] as String : 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?q=80&w=200&auto=format&fit=crop';
                           final price = service['clinicVisitAvailable'] == true
@@ -698,7 +692,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Image
                                   ClipRRect(
                                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                                     child: Image.network(
@@ -713,7 +706,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                       ),
                                     ),
                                   ),
-                                  
                                   Padding(
                                     padding: const EdgeInsets.all(10.0),
                                     child: Column(
@@ -748,27 +740,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                           ],
                                         ),
                                         const SizedBox(height: 6),
-                                        
-                                        // Availability Badges
                                         Row(
                                           children: [
                                             if (service['clinicVisitAvailable'] == true)
                                               Container(
                                                 margin: const EdgeInsets.only(right: 4),
                                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFEFF6FF),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
+                                                decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(4)),
                                                 child: const Text('Clinic', style: TextStyle(fontSize: 8, color: Color(0xFF3B82F6), fontWeight: FontWeight.bold)),
                                               ),
                                             if (service['homeVisitAvailable'] == true)
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: const Color(0xFFECFDF5),
-                                                  borderRadius: BorderRadius.circular(4),
-                                                ),
+                                                decoration: BoxDecoration(color: const Color(0xFFECFDF5), borderRadius: BorderRadius.circular(4)),
                                                 child: const Text('Home', style: TextStyle(fontSize: 8, color: Color(0xFF10B981), fontWeight: FontWeight.bold)),
                                               ),
                                           ],
@@ -785,10 +769,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 28),
 
                     // Upcoming Appointment Section
-                    const Text(
-                      'Upcoming Appointment',
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                    ),
+                    const Text('Upcoming Appointment', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
                     const SizedBox(height: 12),
                     if (upcomingAppt != null)
                       Container(
@@ -797,13 +778,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: const Color(0xFFF1F5F9)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.02),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            )
-                          ],
                         ),
                         child: Row(
                           children: [
@@ -834,10 +808,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     children: [
                                       const Icon(Icons.access_time_filled_rounded, size: 13, color: Color(0xFF0D9488)),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        '${upcomingAppt['date']} • ${upcomingAppt['timeSlot']}',
-                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
-                                      ),
+                                      Text('${upcomingAppt['date']} • ${upcomingAppt['timeSlot']}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
                                     ],
                                   ),
                                 ],
@@ -865,24 +836,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
-                                    'Dr. Anjali Verma',
-                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
-                                  ),
+                                  const Text('Dr. Anjali Verma', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A))),
                                   const SizedBox(height: 2),
-                                  const Text(
-                                    'Physiotherapist',
-                                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                  ),
+                                  const Text('Physiotherapist', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                                   const SizedBox(height: 6),
                                   Row(
                                     children: const [
                                       Icon(Icons.access_time_filled_rounded, size: 13, color: Color(0xFF0D9488)),
                                       SizedBox(width: 4),
-                                      Text(
-                                        '20 May 2026 • 11:00 AM',
-                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D9488)),
-                                      ),
+                                      Text('20 May 2026 • 11:00 AM', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
                                     ],
                                   ),
                                 ],
@@ -894,10 +856,171 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     
                     const SizedBox(height: 28),
 
+                    // Testimonials Horizontal Slider Section (CMS Driven)
+                    if (_testimonials.isNotEmpty) ...[
+                      const Text('What Our Patients Say', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _testimonials.length,
+                          itemBuilder: (context, index) {
+                            final test = _testimonials[index];
+                            return Container(
+                              width: 280,
+                              margin: const EdgeInsets.only(right: 12, bottom: 4),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFF1F5F9)),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 8, offset: const Offset(0, 4))
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(test['name'] ?? 'Anonymous', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A))),
+                                      Row(
+                                        children: List.generate(
+                                          (test['rating'] ?? 5) as int,
+                                          (index) => const Icon(Icons.star_rounded, size: 14, color: Colors.orange),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(test['designation'] ?? 'Patient', style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 8),
+                                  Expanded(
+                                    child: Text(
+                                      test['feedback'] ?? '',
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), height: 1.4, fontStyle: FontStyle.italic),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
+                    // Expandable FAQs Section (CMS Driven)
+                    if (_faqs.isNotEmpty) ...[
+                      const Text('Frequently Asked Questions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 12),
+                      ListView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: _faqs.length,
+                        itemBuilder: (context, index) {
+                          final faq = _faqs[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: const Color(0xFFF1F5F9)),
+                            ),
+                            child: Theme(
+                              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                              child: ExpansionTile(
+                                leading: const Icon(Icons.help_center_rounded, color: Color(0xFF0F766E), size: 20),
+                                title: Text(faq['question'] ?? '', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A))),
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 20.0, right: 20.0, bottom: 16.0),
+                                    child: Text(faq['answer'] ?? '', style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, height: 1.5)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
                     // Embedded Recovery Analytics Trend Chart
                     const RecoveryTrendChart(),
+                    const SizedBox(height: 24),
 
-                    const SizedBox(height: 32),
+                    // Clinic Location & Contact details card block (CMS Driven)
+                    if (_contactDetails.isNotEmpty) ...[
+                      const Text('Clinic Information', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F766E),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(color: const Color(0xFF0F766E).withOpacity(0.15), blurRadius: 12, offset: const Offset(0, 6))
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: const [
+                                Icon(Icons.local_hospital_rounded, color: Colors.white, size: 20),
+                                SizedBox(width: 8),
+                                Text('PhysioCare Clinic Hub', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                              ],
+                            ),
+                            const Divider(height: 24, color: Colors.white24),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Icon(Icons.location_on_rounded, color: Colors.white70, size: 16),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _contactDetails['address'] ?? 'Plot 15, Healthcare Hub, Sector 4, New Delhi',
+                                    style: const TextStyle(color: Colors.white, fontSize: 13, height: 1.4, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.access_time_filled_rounded, color: Colors.white70, size: 16),
+                                const SizedBox(width: 8),
+                                Text(_contactDetails['workingHours'] ?? 'Monday - Saturday: 9:00 AM to 7:00 PM', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.phone_rounded, color: Colors.white70, size: 16),
+                                const SizedBox(width: 8),
+                                Text(_contactDetails['phone'] ?? '+91 98765 43210', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                const Icon(Icons.alternate_email_rounded, color: Colors.white70, size: 16),
+                                const SizedBox(width: 8),
+                                Text(_contactDetails['email'] ?? 'contact@globalwebify.com', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 48),
                   ],
                 ),
               ),
