@@ -14,6 +14,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _apiService = ApiService();
   bool _isLoading = false;
 
+  @override
+  void dispose() {
+    _mobileController.dispose();
+    super.dispose();
+  }
+
   Future<void> _sendOtp() async {
     final mobile = _mobileController.text.trim();
     if (mobile.length < 10) {
@@ -56,12 +62,12 @@ class _LoginScreenState extends State<LoginScreen> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           )
         ],
-        border: Border.all(color: const Color(0xFFF1F5F9)),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Icon(icon, color: color, size: 24),
     );
@@ -70,9 +76,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8FAFC),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Color(0xFF0F172A), size: 20),
@@ -81,41 +87,53 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 28.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              // Brand Icon
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0F766E).withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Icon(Icons.medical_services_rounded, color: Color(0xFF0F766E), size: 32),
+              ),
+              const SizedBox(height: 20),
+
               const Text(
-                'Welcome Back!',
+                'Welcome Back! 👋',
                 style: TextStyle(
-                  fontSize: 30,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF0F172A),
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               const Text(
-                'Sign in to continue',
+                'Sign in to access your appointments, physiotherapists & care plans.',
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   color: Color(0xFF64748B),
                   fontWeight: FontWeight.w500,
+                  height: 1.4,
                 ),
               ),
-              const SizedBox(height: 48),
-              
-              // Mobile text field in container with shadow
+              const SizedBox(height: 36),
+
+              // Mobile text field matching design system
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF4F46E5).withOpacity(0.03),
+                      color: const Color(0xFF0F766E).withOpacity(0.04),
                       blurRadius: 15,
-                      offset: const Offset(0, 8),
+                      offset: const Offset(0, 6),
                     )
                   ],
                 ),
@@ -126,42 +144,34 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
                   decoration: InputDecoration(
                     counterText: '',
-                    labelText: 'Email or Phone Number',
+                    labelText: 'Mobile Number / मोबाइल नंबर',
                     labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
-                    prefixIcon: const Icon(Icons.phone_outlined, color: Color(0xFF4F46E5)),
+                    prefixIcon: const Icon(Icons.phone_iphone_rounded, color: Color(0xFF0F766E)),
                     prefixText: '+91 ',
                     prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+                    fillColor: Colors.white,
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.2),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF4F46E5), width: 2),
+                      borderSide: const BorderSide(color: Color(0xFF0F766E), width: 2),
                     ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   ),
                 ),
               ),
-              
-              const SizedBox(height: 16),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  style: TextButton.styleFrom(foregroundColor: const Color(0xFF64748B)),
-                  child: const Text('Forgot Password?', style: TextStyle(fontWeight: FontWeight.w600)),
-                ),
-              ),
               const SizedBox(height: 24),
-              
+
+              // Sign In Button
               ElevatedButton(
                 onPressed: _isLoading ? null : _sendOtp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0A7075), // Dark teal premium color
+                  backgroundColor: const Color(0xFF0F766E), // Deep Teal theme
                   foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 56),
+                  minimumSize: const Size(double.infinity, 54),
                   elevation: 0,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -169,17 +179,17 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: _isLoading
                     ? const SizedBox(
-                        height: 24,
-                        width: 24,
+                        height: 22,
+                        width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                       )
                     : const Text(
-                        'Sign In',
+                        'Get OTP / आगे बढ़ें',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                       ),
               ),
-              
-              const SizedBox(height: 48),
+              const SizedBox(height: 36),
+
               Row(
                 children: const [
                   Expanded(child: Divider(color: Color(0xFFE2E8F0))),
@@ -187,13 +197,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     padding: EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
                       'or continue with',
-                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontWeight: FontWeight.w500),
                     ),
                   ),
                   Expanded(child: Divider(color: Color(0xFFE2E8F0))),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -202,25 +212,25 @@ class _LoginScreenState extends State<LoginScreen> {
                   _buildSocialButton(Icons.apple_rounded, Colors.black),
                 ],
               ),
-              
-              const SizedBox(height: 48),
+              const SizedBox(height: 36),
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'Don\'t have an account? ',
-                    style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    'By signing in you agree to our ',
+                    style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
                   ),
                   GestureDetector(
                     onTap: () {},
                     child: const Text(
-                      'Sign Up',
-                      style: TextStyle(color: Color(0xFF0A7075), fontWeight: FontWeight.bold),
+                      'Terms & Privacy',
+                      style: TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                   )
                 ],
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
             ],
           ),
         ),

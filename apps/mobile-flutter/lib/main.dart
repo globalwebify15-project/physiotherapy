@@ -5,11 +5,13 @@ import 'features/onboarding/onboarding_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/otp_screen.dart';
 import 'features/home/home_screen.dart';
+import 'features/home/all_services_screen.dart';
+import 'features/service_providers/service_providers_screen.dart';
+import 'features/offers/offers_screen.dart';
 import 'features/booking/booking_screen.dart';
 import 'features/appointments/appointments_screen.dart';
 import 'features/exercises/exercises_screen.dart';
 import 'features/pain_tracker/pain_tracker_screen.dart';
-import 'features/home/consult_online_screen.dart';
 import 'features/home/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/theme_provider.dart';
@@ -53,8 +55,32 @@ class PhysioApp extends ConsumerWidget {
           builder: (context, state) => const HomeScreen(),
         ),
         GoRoute(
+          path: '/all_services',
+          builder: (context, state) => const AllServicesScreen(),
+        ),
+        GoRoute(
+          path: '/service_providers',
+          builder: (context, state) => const ServiceProvidersScreen(),
+        ),
+        GoRoute(
+          path: '/offers',
+          builder: (context, state) => const OffersScreen(),
+        ),
+        GoRoute(
           path: '/booking',
-          builder: (context, state) => const BookingScreen(),
+          builder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            final doctorId = extra?['doctorId'] as String? ?? state.uri.queryParameters['doctorId'];
+            final doctorName = extra?['doctorName'] as String? ?? state.uri.queryParameters['doctorName'];
+            final serviceId = extra?['serviceId'] as String? ?? state.uri.queryParameters['serviceId'];
+            final serviceTitle = extra?['serviceTitle'] as String? ?? state.uri.queryParameters['serviceTitle'];
+            return BookingScreen(
+              initialDoctorId: doctorId,
+              initialDoctorName: doctorName,
+              initialServiceId: serviceId,
+              initialServiceTitle: serviceTitle,
+            );
+          },
         ),
         GoRoute(
           path: '/appointments',
@@ -67,10 +93,6 @@ class PhysioApp extends ConsumerWidget {
         GoRoute(
           path: '/pain_tracker',
           builder: (context, state) => const PainTrackerScreen(),
-        ),
-        GoRoute(
-          path: '/consult_online',
-          builder: (context, state) => const ConsultOnlineScreen(),
         ),
         GoRoute(
           path: '/profile',
@@ -92,7 +114,7 @@ class PhysioApp extends ConsumerWidget {
     );
 
     return MaterialApp.router(
-      title: 'PhysioCare',
+      title: 'QuickPhysio24.com',
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       themeMode: themeMode,
@@ -100,7 +122,7 @@ class PhysioApp extends ConsumerWidget {
         useMaterial3: true,
         fontFamily: 'Outfit',
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0F766E), // Teal Accent
+          seedColor: const Color(0xFF0F766E), // Teal Primary Accent
           primary: const Color(0xFF0F766E),
           secondary: const Color(0xFF10B981), // Emerald Accent
           surface: Colors.white,

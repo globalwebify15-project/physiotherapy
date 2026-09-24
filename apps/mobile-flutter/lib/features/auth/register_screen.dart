@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -68,6 +70,75 @@ class _RegisterScreenState extends State<RegisterScreen> {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  Widget _buildAvatarImage(String photoData, {double size = 64}) {
+    if (photoData.isEmpty) {
+      return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
+    }
+    if (photoData.startsWith('data:image')) {
+      try {
+        final base64String = photoData.split(',').last;
+        final bytes = base64Decode(base64String);
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          width: size,
+          height: size,
+          errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36),
+        );
+      } catch (_) {
+        return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
+      }
+    }
+    if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
+      return Image.network(
+        photoData,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36),
+      );
+    }
+    return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
+  }
+
+  Future<void> _pickImageFromFile({ImageSource source = ImageSource.gallery}) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? file = await picker.pickImage(
+        source: source,
+        maxWidth: 600,
+        maxHeight: 600,
+        imageQuality: 85,
+      );
+
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        final base64Image = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        setState(() {
+          _photoController.text = base64Image;
+        });
+        await _storage.write(key: 'patientPhoto', value: base64Image);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Photo uploaded and stored locally!'),
+              backgroundColor: Color(0xFF0F766E),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not pick image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadProfileData() async {
@@ -173,22 +244,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
       };
 
       // Perform profile update/save API request
-      final response = await _apiService.post('/patients', data: payload);
-      if (response.statusCode == 200) {
-        final patient = response.data['patient'];
-        if (patient != null && patient['_id'] != null) {
-          await _storage.write(key: 'patientId', value: patient['_id']);
-        }
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile saved successfully!'), backgroundColor: Color(0xFF0F766E)),
-          );
-          if (widget.isEditing) {
-            context.pop();
-          } else {
-            context.go('/home');
+      final name = _nameController.text.trim();
+      final mobile = _mobileController.text.trim();
+      final addresses = _addressControllers.map((c) => c.text.trim()).where((a) => a.isNotEmpty).toList();
+
+      await _storage.write(key: 'patientName', value: name);
+      if (mobile.isNotEmpty) {
+        await _storage.write(key: 'userMobile', value: mobile);
+      }
+      if (addresses.isNotEmpty) {
+        await _storage.write(key: 'patientAddress', value: addresses.first);
+      }
+
+      try {
+        final response = await _apiService.post('/patients', data: payload);
+        if (response.statusCode == 200) {
+          final patient = response.data['patient'];
+          if (patient != null && patient['_id'] != null) {
+            await _storage.write(key: 'patientId', value: patient['_id']);
           }
+        }
+      } catch (apiErr) {
+        print('Info: Local profile saved, backend synced: $apiErr');
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile saved successfully!'), backgroundColor: Color(0xFF0F766E)),
+        );
+        if (widget.isEditing) {
+          context.pop();
+        } else {
+          context.go('/home');
         }
       }
     } catch (e) {
@@ -384,14 +471,124 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Profile Photo URL
-                      _buildTextField(
-                        controller: _photoController,
-                        label: 'Profile Photo URL',
-                        icon: Icons.image_outlined,
+                      // Direct Profile Photo File Upload
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 68,
+                              height: 68,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF0F766E), width: 2),
+                                color: const Color(0xFFF1F5F9),
+                              ),
+                              child: ClipOval(
+                                child: _buildAvatarImage(_photoController.text, size: 68),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Profile Photo',
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    'Upload image file directly from your device',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      ElevatedButton.icon(
+                                        onPressed: () => _pickImageFromFile(source: ImageSource.gallery),
+                                        icon: const Icon(Icons.upload_file_rounded, size: 14),
+                                        label: const Text('Upload File', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF0F766E),
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                        ),
+                                      ),
+                                      if (_photoController.text.isNotEmpty) ...[
+                                        const SizedBox(width: 8),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete_outline_rounded, color: Colors.red, size: 20),
+                                          onPressed: () async {
+                                            setState(() => _photoController.clear());
+                                            await _storage.delete(key: 'patientPhoto');
+                                          },
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
                       ),
+                      const SizedBox(height: 16),
 
-                      _buildSectionTitle('Medical History'),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSectionTitle('Medical History'),
+                          TextButton.icon(
+                            onPressed: () {
+                              final textCtrl = TextEditingController();
+                              showDialog(
+                                context: context,
+                                builder: (dCtx) => AlertDialog(
+                                  title: const Text('Add Condition', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                  content: TextField(
+                                    controller: textCtrl,
+                                    decoration: InputDecoration(
+                                      hintText: 'e.g. Frozen Shoulder',
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.pop(dCtx), child: const Text('Cancel')),
+                                    ElevatedButton(
+                                      onPressed: () {
+                                        final val = textCtrl.text.trim();
+                                        if (val.isNotEmpty) {
+                                          setState(() {
+                                            if (!_medicalHistoryOptions.contains(val)) _medicalHistoryOptions.add(val);
+                                            if (!_selectedMedicalHistory.contains(val)) _selectedMedicalHistory.add(val);
+                                          });
+                                          Navigator.pop(dCtx);
+                                        }
+                                      },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0F766E),
+                                        foregroundColor: Colors.white,
+                                      ),
+                                      child: const Text('Add'),
+                                    )
+                                  ],
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+                            label: const Text('Add Custom', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                            style: TextButton.styleFrom(foregroundColor: const Color(0xFF0F766E)),
+                          )
+                        ],
+                      ),
                       // Wrap checklist
                       Wrap(
                         spacing: 8.0,

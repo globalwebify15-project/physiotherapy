@@ -14,7 +14,8 @@ import {
   Menu,
   X,
   Bell,
-  Heart
+  Heart,
+  Smartphone
 } from 'lucide-react';
 
 interface SidebarItem {
@@ -30,6 +31,7 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { name: 'Services', href: '/admin/services', icon: Activity },
   { name: 'CMS Settings', href: '/admin/cms', icon: Settings },
   { name: 'Payments', href: '/admin/payments', icon: CreditCard },
+  { name: 'Download App (APK)', href: '/apk', icon: Smartphone },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -60,7 +62,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <Heart size={16} fill="currentColor" />
           </div>
           <div>
-            <h1 className="font-bold text-slate-800 leading-none">PhysioCare</h1>
+            <h1 className="font-bold text-slate-800 leading-none">QuickPhysio24.com</h1>
             <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Admin Portal</span>
           </div>
         </div>
@@ -108,7 +110,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <header className="h-16 bg-white/80 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 flex items-center justify-between px-6 lg:px-8">
           <div>
             <h2 className="text-lg font-bold text-slate-800">
-              {SIDEBAR_ITEMS.find((item) => pathname === item.href)?.name || 'PhysioCare Admin'}
+              {SIDEBAR_ITEMS.find((item) => pathname === item.href)?.name || 'QuickPhysio24.com Admin'}
             </h2>
           </div>
 

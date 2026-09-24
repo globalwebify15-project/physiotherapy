@@ -10,7 +10,9 @@ import {
   Save, 
   Info, 
   Plus, 
-  FileText 
+  FileText,
+  MessageCircle,
+  UserCheck
 } from 'lucide-react';
 
 export const revalidate = 0; // Dynamic fetch
@@ -19,6 +21,9 @@ export const revalidate = 0; // Dynamic fetch
 async function updateContactAction(formData: FormData) {
   'use server';
   const phone = formData.get('phone') as string;
+  const whatsapp = formData.get('whatsapp') as string;
+  const drRajnishPhone = formData.get('drRajnishPhone') as string;
+  const drPriyankaPhone = formData.get('drPriyankaPhone') as string;
   const email = formData.get('email') as string;
   const address = formData.get('address') as string;
   const website = formData.get('website') as string;
@@ -28,7 +33,16 @@ async function updateContactAction(formData: FormData) {
   await CMS.findOneAndUpdate(
     { key: 'contact_details' },
     { 
-      content: { phone, email, address, website, workingHours } 
+      content: { 
+        phone, 
+        whatsapp, 
+        drRajnishPhone, 
+        drPriyankaPhone, 
+        email, 
+        address, 
+        website, 
+        workingHours 
+      } 
     },
     { upsert: true }
   );
@@ -65,11 +79,14 @@ export default async function CMSPage() {
   // Load Contact Details
   const contactCMS = await CMS.findOne({ key: 'contact_details' });
   const contacts = contactCMS?.content || {
-    phone: '',
-    email: '',
-    address: '',
-    website: '',
-    workingHours: ''
+    phone: '+91 98765 43210',
+    whatsapp: '+91 98765 43210',
+    drRajnishPhone: '+91 98765 43210',
+    drPriyankaPhone: '+91 98765 43211',
+    email: 'contact@drbariyarphysio.com',
+    address: 'Near, Ashok Nagar Rd No 1, opposite Overhead Water Tank, Ashok Nagar, Ranchi, Jharkhand 834002',
+    website: 'https://drbariyarphysio.com',
+    workingHours: '9:00 AM – 7:00 PM (Monday – Sunday)'
   };
 
   // Load FAQs
@@ -82,35 +99,91 @@ export default async function CMSPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Content Management (CMS)</h1>
         <p className="text-sm text-slate-400 font-medium mt-1">
-          Customize website details, clinic location data, contact coordinates, and patient FAQs.
+          Manage clinic phone calling numbers, WhatsApp support helpline, doctor contacts, clinic address, and FAQs.
         </p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         
-        {/* Left Column: Contact details configuration */}
+        {/* Left Column: Contact & Calling Numbers configuration */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm space-y-6">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Settings className="text-indigo-600 w-5 h-5" />
-            <h3 className="font-bold text-slate-800 text-lg">Clinic Profile Info</h3>
+            <h3 className="font-bold text-slate-800 text-lg">Calling & WhatsApp Support Settings</h3>
           </div>
 
           <form action={updateContactAction} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Phone Number</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Helpline Phone Number
+                </label>
                 <div className="relative">
-                  <Phone size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                  <Phone size={16} className="absolute left-3.5 top-3.5 text-teal-600" />
                   <input 
                     type="text" 
                     name="phone" 
-                    defaultValue={contacts.phone} 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                    defaultValue={contacts.phone || '+91 98765 43210'} 
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
                   />
                 </div>
               </div>
+
               <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Clinic Email</label>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  WhatsApp Support Number
+                </label>
+                <div className="relative">
+                  <MessageCircle size={16} className="absolute left-3.5 top-3.5 text-emerald-600" />
+                  <input 
+                    type="text" 
+                    name="whatsapp" 
+                    defaultValue={contacts.whatsapp || '+91 98765 43210'} 
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Dr. Rajnish Calling Number
+                </label>
+                <div className="relative">
+                  <UserCheck size={16} className="absolute left-3.5 top-3.5 text-indigo-600" />
+                  <input 
+                    type="text" 
+                    name="drRajnishPhone" 
+                    defaultValue={contacts.drRajnishPhone || '+91 98765 43210'} 
+                    placeholder="+91 98765 43210"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                  Dr. Priyanka Calling Number
+                </label>
+                <div className="relative">
+                  <UserCheck size={16} className="absolute left-3.5 top-3.5 text-pink-600" />
+                  <input 
+                    type="text" 
+                    name="drPriyankaPhone" 
+                    defaultValue={contacts.drPriyankaPhone || '+91 98765 43211'} 
+                    placeholder="+91 98765 43211"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-semibold text-slate-800 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Clinic Email</label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                   <input 
@@ -121,33 +194,32 @@ export default async function CMSPage() {
                   />
                 </div>
               </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Website URL</label>
-              <div className="relative">
-                <Globe size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
-                <input 
-                  type="text" 
-                  name="website" 
-                  defaultValue={contacts.website} 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
-                />
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Website URL</label>
+                <div className="relative">
+                  <Globe size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                  <input 
+                    type="text" 
+                    name="website" 
+                    defaultValue={contacts.website} 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-10 pr-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
               </div>
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Working Hours Summary</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Working Hours Summary</label>
               <input 
                 type="text" 
                 name="workingHours" 
-                defaultValue={contacts.workingHours} 
+                defaultValue={contacts.workingHours || '9:00 AM – 7:00 PM (Monday – Sunday)'} 
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
               />
             </div>
 
             <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Physical Address</label>
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">Physical Address</label>
               <div className="relative">
                 <MapPin size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
                 <textarea 
@@ -161,10 +233,10 @@ export default async function CMSPage() {
 
             <button 
               type="submit" 
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-xl flex items-center gap-2 text-sm ml-auto transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl flex items-center gap-2 text-sm ml-auto transition-colors shadow-sm shadow-indigo-100"
             >
               <Save size={16} />
-              Save Clinic Profile
+              Save Calling & Contact Numbers
             </button>
           </form>
         </div>
@@ -185,14 +257,14 @@ export default async function CMSPage() {
               type="text" 
               name="question" 
               required 
-              placeholder="e.g. Can I cancel within 2 hours?" 
+              placeholder="e.g. How can I call the doctor directly?" 
               className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-indigo-500"
             />
             <textarea 
               name="answer" 
               required 
               rows={2}
-              placeholder="e.g. Yes, cancellations made up to 2 hours before are fully refunded." 
+              placeholder="e.g. Tap on Call Doctor on home screen or Call Support to directly talk with our specialists." 
               className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-indigo-500 resize-none"
             />
             <button 
@@ -204,7 +276,7 @@ export default async function CMSPage() {
           </form>
 
           {/* List of current FAQs */}
-          <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+          <div className="space-y-4 max-h-[340px] overflow-y-auto pr-2">
             {faqs.length === 0 ? (
               <p className="text-slate-400 text-xs italic text-center py-4">No FAQs defined.</p>
             ) : (
