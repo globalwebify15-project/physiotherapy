@@ -25,25 +25,17 @@ export default function ApkDownloadPage() {
 
   const apkOptions = [
     {
-      title: 'Universal APK (Recommended)',
-      filename: 'app-release.apk',
-      size: '21.4 MB',
-      desc: 'Compatible with all Android devices (arm64, armeabi-v7a, x86_64).',
-      recommended: true,
-      badge: 'Universal Build',
-    },
-    {
-      title: 'Physio Standalone Release',
+      title: 'Optimized Release APK (Recommended)',
       filename: 'Physio.apk',
-      size: '23.0 MB',
-      desc: 'Complete standalone clinic release bundle with all bundled assets.',
-      recommended: false,
-      badge: 'Full Bundle',
+      size: '21.4 MB',
+      desc: 'Optimized 64-bit production release with R8 shrinking, Proguard, and obfuscation.',
+      recommended: true,
+      badge: 'Optimized (21.4 MB)',
     },
     {
-      title: 'ARM64-v8a 64-bit APK',
+      title: 'ARM64-v8a 64-bit Device Build',
       filename: 'app-arm64-v8a-release.apk',
-      size: '20.7 MB',
+      size: '21.4 MB',
       desc: 'Optimized specifically for modern 64-bit Android smartphones.',
       recommended: false,
       badge: '64-bit Fast',
@@ -51,10 +43,18 @@ export default function ApkDownloadPage() {
     {
       title: 'ARMv7a 32-bit Legacy',
       filename: 'app-armeabi-v7a-release.apk',
-      size: '18.0 MB',
-      desc: 'Lightweight build for older Android devices and tablets.',
+      size: '18.8 MB',
+      desc: 'Ultra-lightweight build for older Android devices and tablets.',
       recommended: false,
-      badge: 'Legacy 32-bit',
+      badge: 'Legacy 32-bit (18.8 MB)',
+    },
+    {
+      title: 'Standard Release Mirror',
+      filename: 'app-release.apk',
+      size: '21.4 MB',
+      desc: 'Mirror build for automated distribution and OTA updates.',
+      recommended: false,
+      badge: 'Release Mirror',
     },
   ];
 
