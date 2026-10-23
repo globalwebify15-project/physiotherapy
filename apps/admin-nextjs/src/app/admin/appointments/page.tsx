@@ -98,7 +98,7 @@ export default async function AppointmentsPage() {
       case 'confirmed':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200/50';
       case 'assigned':
-        return 'bg-indigo-50 text-indigo-700 border-indigo-200/50';
+        return 'bg-teal-50 text-teal-700 border-teal-200/50';
       case 'in-progress':
         return 'bg-blue-50 text-blue-700 border-blue-200/50';
       case 'completed':
@@ -140,7 +140,7 @@ export default async function AppointmentsPage() {
                 {/* Top header row */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-extrabold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-lg">
+                    <span className="text-sm font-extrabold text-teal-700 bg-teal-50 border border-teal-100/60 px-3 py-1 rounded-lg">
                       {appt.visitType.toUpperCase()}
                     </span>
                     <span className="text-xs text-slate-400 font-semibold">
@@ -194,7 +194,7 @@ export default async function AppointmentsPage() {
                     <select 
                       name="therapistId" 
                       defaultValue={appt.therapistId?._id?.toString() || ''}
-                      className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-indigo-500 flex-1"
+                      className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-teal-500 flex-1"
                     >
                       <option value="">-- Assign Therapist --</option>
                       {therapists.map((t) => (
@@ -205,7 +205,7 @@ export default async function AppointmentsPage() {
                     </select>
                     <button 
                       type="submit" 
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                      className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm shadow-teal-100"
                     >
                       Assign
                     </button>
@@ -277,11 +277,11 @@ export default async function AppointmentsPage() {
           </div>
 
           {/* Guidelines info card */}
-          <div className="bg-indigo-50/50 rounded-2xl border border-indigo-100/50 p-6 flex gap-3">
-            <AlertCircle className="text-indigo-600 shrink-0 mt-0.5" size={20} />
+          <div className="bg-teal-50/50 rounded-2xl border border-teal-100/60 p-6 flex gap-3">
+            <AlertCircle className="text-teal-600 shrink-0 mt-0.5" size={20} />
             <div className="space-y-1">
-              <h4 className="text-sm font-bold text-indigo-900">Therapist Scheduling Rules</h4>
-              <p className="text-xs text-indigo-700/80 leading-relaxed">
+              <h4 className="text-sm font-bold text-teal-950">Therapist Scheduling Rules</h4>
+              <p className="text-xs text-teal-800/80 leading-relaxed">
                 Before assigning a therapist, check their schedule availability on the Therapists tab. The portal validates slot conflicts automatically to avoid double-bookings.
               </p>
             </div>

@@ -23,10 +23,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isLoading = true;
 
   // Dynamic Dashboard Data
-  String _patientName = 'Amarjeet';
-  String _locationAddress = 'Near, Ashok Nagar Rd No 1, opposite O...';
+  String _patientName = 'Patient';
+  String _locationAddress = 'Set your clinic or home address';
   List<dynamic> _appointments = [];
   List<dynamic> _services = [];
+  List<dynamic> _therapists = [];
+  List<Map<String, dynamic>> _banners = ApiService.defaultBanners;
+  List<Map<String, String>> _faqs = ApiService.defaultFaqs;
 
   // Interactive Carousel State
   final PageController _bannerController = PageController();
@@ -100,9 +103,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   void _startBannerTimer() {
     _bannerTimer?.cancel();
+    final count = _banners.isNotEmpty ? _banners.length : 5;
     _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted || !_bannerController.hasClients) return;
-      final nextIndex = (_activeBannerIndex + 1) % 4;
+      final nextIndex = (_activeBannerIndex + 1) % count;
       _bannerController.animateToPage(
         nextIndex,
         duration: const Duration(milliseconds: 450),
@@ -120,13 +124,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _fetchDashboardData() async {
     final storage = const FlutterSecureStorage();
-    final cachedName = await storage.read(key: 'patientName');
-    final cachedAddr = await storage.read(key: 'patientAddress');
+    final currentMobile = await storage.read(key: 'userMobile') ?? '';
+    final cachedName = await storage.read(key: 'patientName_$currentMobile') ?? await storage.read(key: 'patientName');
+    final cachedAddr = await storage.read(key: 'patientAddress_$currentMobile') ?? await storage.read(key: 'patientAddress');
 
     if (mounted) {
       setState(() {
-        if (cachedName != null && cachedName.isNotEmpty) _patientName = cachedName;
-        if (cachedAddr != null && cachedAddr.isNotEmpty) _locationAddress = cachedAddr;
+        if (cachedName != null && cachedName.isNotEmpty) {
+          _patientName = cachedName;
+        } else {
+          _patientName = currentMobile.isNotEmpty ? 'Patient' : 'Welcome Guest';
+        }
+        if (cachedAddr != null && cachedAddr.isNotEmpty) {
+          _locationAddress = cachedAddr;
+        } else {
+          _locationAddress = 'Set your clinic or home address';
+        }
       });
     }
 
@@ -135,16 +148,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       try {
         final patientRes = await _apiService.get('/patients');
         if (patientRes.statusCode == 200 && patientRes.data['patient'] != null) {
-          final fetchedName = patientRes.data['patient']['name'];
-          final fetchedAddress = patientRes.data['patient']['address'];
-
-          if (fetchedName != null) await storage.write(key: 'patientName', value: fetchedName);
-          if (fetchedAddress != null) await storage.write(key: 'patientAddress', value: fetchedAddress);
+          final fetchedName = patientRes.data['patient']['name']?.toString() ?? '';
+          final fetchedAddress = patientRes.data['patient']['address']?.toString() ?? '';
 
           if (mounted) {
             setState(() {
-              if (fetchedName != null) _patientName = fetchedName;
-              if (fetchedAddress != null) _locationAddress = fetchedAddress;
+              if (fetchedName.isNotEmpty) _patientName = fetchedName;
+              if (fetchedAddress.isNotEmpty) _locationAddress = fetchedAddress;
             });
           }
         }
@@ -152,17 +162,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         // Fallback to storage
       }
 
-      // 2. Fetch Appointments & Services
+      // 2. Fetch Appointments, Services & Therapists
       final apptsRes = await _apiService.get('/appointments');
       final servicesRes = await _apiService.get('/services');
+      List<dynamic> fetchedTherapists = [];
+      try {
+        final therapistsRes = await _apiService.get('/therapists');
+        if (therapistsRes.data != null && therapistsRes.data['therapists'] != null) {
+          fetchedTherapists = therapistsRes.data['therapists'] as List<dynamic>;
+        }
+      } catch (_) {}
 
-      setState(() {
-        _appointments = apptsRes.data['appointments'] ?? [];
-        _services = servicesRes.data['services'] ?? [];
-        _isLoading = false;
-      });
+      // 3. Fetch Dynamic CMS Banners & FAQs from MongoDB Atlas
+      List<Map<String, dynamic>> fetchedBanners = [];
+      List<Map<String, String>> fetchedFaqs = [];
+      try {
+        fetchedBanners = await _apiService.fetchCmsBanners();
+        fetchedFaqs = await _apiService.fetchCmsFaqs();
+      } catch (e) {
+        print('[CMS Dashboard Fetch Error, using core fallbacks]: $e');
+      }
+
+      if (mounted) {
+        setState(() {
+          _appointments = apptsRes.data['appointments'] ?? [];
+          _services = servicesRes.data['services'] ?? [];
+          _therapists = fetchedTherapists;
+          if (fetchedBanners.isNotEmpty) _banners = fetchedBanners;
+          if (fetchedFaqs.isNotEmpty) _faqs = fetchedFaqs;
+          _isLoading = false;
+        });
+        _startBannerTimer();
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -676,109 +709,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Promo / Banner Slider matching Reference Design (6 Creative Cards)
+                          // Dynamic Promo / Banner Slider populated from Admin CMS / Database
                           SizedBox(
                             height: 215,
-                            child: PageView(
+                            child: PageView.builder(
                               controller: _bannerController,
                               onPageChanged: (idx) => setState(() => _activeBannerIndex = idx),
-                              children: [
-                                // Card 1: Say Goodbye to Pain
-                                _buildModernBannerCard(
-                                  numberTag: '1.',
-                                  pageTag: '1/4',
-                                  title: 'Say Goodbye\nto Pain',
-                                  subtitle: "Back, neck, knee or shoulder —\nwe've got you covered.",
-                                  ctaText: 'Learn More →',
-                                  ctaColor: const Color(0xFF0F766E),
-                                  ctaTextColor: Colors.white,
-                                  gradientColors: const [Color(0xFFFFFDF5), Color(0xFFFEF3C7), Color(0xFFFDE68A)],
-                                  borderColor: const Color(0xFFFCD34D).withOpacity(0.8),
-                                  titleColor: const Color(0xFF0F172A),
-                                  subtitleColor: const Color(0xFF475569),
-                                  visual: _buildSpineGlowVisual(),
-                                  bottomChips: const [
-                                    {'icon': Icons.accessibility_new_rounded, 'label': 'Back Pain'},
-                                    {'icon': Icons.bolt_rounded, 'label': 'Neck Pain'},
-                                    {'icon': Icons.adjust_rounded, 'label': 'Joint Pain'},
-                                  ],
-                                  onTap: () => context.push('/all_services'),
-                                ),
-
-                                // Card 2: Recover Faster
-                                _buildModernBannerCard(
-                                  numberTag: '2.',
-                                  pageTag: '2/4',
-                                  title: 'Recover\nFaster',
-                                  subtitle: 'Post-surgery rehab &\nsports physiotherapy.',
-                                  ctaText: 'Get Started →',
-                                  ctaColor: const Color(0xFF0284C7),
-                                  ctaTextColor: Colors.white,
-                                  gradientColors: const [Color(0xFFF0F9FF), Color(0xFFE0F2FE), Color(0xFFBAE6FD)],
-                                  borderColor: const Color(0xFF38BDF8).withOpacity(0.8),
-                                  titleColor: const Color(0xFF0F172A),
-                                  subtitleColor: const Color(0xFF334155),
-                                  visual: _buildRunnerVisual(),
-                                  bottomChips: const [
-                                    {'icon': Icons.directions_run_rounded, 'label': 'Rehab'},
-                                    {'icon': Icons.sports_kabaddi_rounded, 'label': 'Sports Injury'},
-                                    {'icon': Icons.speed_rounded, 'label': 'Performance'},
-                                  ],
-                                  onTap: () => context.push('/booking'),
-                                ),
-
-                                // Card 3: Better Mobility Better Life
-                                _buildModernBannerCard(
-                                  numberTag: '3.',
-                                  pageTag: '3/4',
-                                  title: 'Better Mobility\nBetter Life',
-                                  subtitle: 'Improve flexibility,\nstrength and balance.',
-                                  ctaText: 'Start Your Journey →',
-                                  ctaColor: const Color(0xFF6B21A8),
-                                  ctaTextColor: Colors.white,
-                                  gradientColors: const [Color(0xFFFAF5FF), Color(0xFFF3E8FF), Color(0xFFE9D5FF)],
-                                  borderColor: const Color(0xFFC084FC).withOpacity(0.8),
-                                  titleColor: const Color(0xFF3B0764),
-                                  subtitleColor: const Color(0xFF4C1D95),
-                                  visual: _buildYogaFlexibilityVisual(),
-                                  bottomChips: const [
-                                    {'icon': Icons.self_improvement_rounded, 'label': 'Flexibility'},
-                                    {'icon': Icons.balance_rounded, 'label': 'Balance'},
-                                    {'icon': Icons.spa_rounded, 'label': 'Wellness'},
-                                  ],
-                                  onTap: () => context.push('/all_services'),
-                                ),
-
-                                // Card 4: Your Journey to a Healthier You
-                                _buildModernBannerCard(
-                                  numberTag: '4.',
-                                  pageTag: '4/4',
-                                  title: 'Your Journey\nto a Healthier You',
-                                  subtitle: 'Professional care for a\nstronger, healthier you.',
-                                  ctaText: 'Start Today →',
-                                  ctaColor: const Color(0xFF0F766E),
-                                  ctaTextColor: Colors.white,
-                                  gradientColors: const [Color(0xFFFFF7ED), Color(0xFFFFEDD5), Color(0xFFFED7AA)],
-                                  borderColor: const Color(0xFFFB923C).withOpacity(0.8),
-                                  titleColor: const Color(0xFF431407),
-                                  subtitleColor: const Color(0xFF7C2D12),
-                                  visual: _buildSunriseSilhouetteVisual(),
-                                  bottomChips: const [
-                                    {'icon': Icons.hiking_rounded, 'label': 'Active Life'},
-                                    {'icon': Icons.accessibility_rounded, 'label': 'Better Posture'},
-                                    {'icon': Icons.sentiment_very_satisfied_rounded, 'label': 'Happier You'},
-                                  ],
-                                  onTap: () => context.push('/service_providers'),
-                                ),
-                              ],
+                              itemCount: _banners.length,
+                              itemBuilder: (context, index) {
+                                return _buildDynamicBannerCard(
+                                  _banners[index],
+                                  index,
+                                  _banners.length,
+                                );
+                              },
                             ),
                           ),
                           const SizedBox(height: 10),
 
-                          // Dot Indicators (4 Items)
+                          // Dynamic Dot Indicators
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: List.generate(4, (index) {
+                            children: List.generate(_banners.length, (index) {
                               final isSelected = _activeBannerIndex == index;
                               return AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
@@ -926,67 +878,134 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           const SizedBox(height: 24),
 
-                          // Upcoming Appointment
-                          const Text(
-                            'Upcoming Appointment',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                          // Upcoming Appointment Header & Counter
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Upcoming Appointments',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                              ),
+                              if (_appointments.isNotEmpty)
+                                GestureDetector(
+                                  onTap: () => context.push('/appointments').then((_) => _fetchDashboardData()),
+                                  child: Row(
+                                    children: [
+                                      Text(
+                                        'View All (${_appointments.length})',
+                                        style: const TextStyle(
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF0F766E),
+                                        ),
+                                      ),
+                                      const Icon(Icons.chevron_right_rounded, size: 16, color: Color(0xFF0F766E)),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 12),
                           if (upcomingAppt != null)
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: const Color(0xFFF1F5F9)),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.02),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  )
-                                ],
-                              ),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 24,
-                                    backgroundColor: const Color(0xFF0F766E).withOpacity(0.1),
-                                    child: const Icon(Icons.person_rounded, color: Color(0xFF0F766E)),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                            GestureDetector(
+                              onTap: () => context.push('/appointments').then((_) => _fetchDashboardData()),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.03),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 4),
+                                    )
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
                                       children: [
-                                        Text(
-                                          (upcomingAppt['therapistId'] is Map && upcomingAppt['therapistId']['name'] != null)
-                                              ? upcomingAppt['therapistId']['name']
-                                              : 'Auto Assigned Therapist',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                                        CircleAvatar(
+                                          radius: 24,
+                                          backgroundColor: const Color(0xFF0F766E).withOpacity(0.12),
+                                          child: const Icon(Icons.medical_services_rounded, color: Color(0xFF0F766E), size: 24),
                                         ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          (upcomingAppt['serviceId'] is Map && upcomingAppt['serviceId']['title'] != null)
-                                              ? upcomingAppt['serviceId']['title']
-                                              : 'Physiotherapy Consultation',
-                                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Row(
-                                          children: [
-                                            const Icon(Icons.access_time_filled_rounded, size: 12, color: Color(0xFF0F766E)),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              '${upcomingAppt['date']} • ${upcomingAppt['timeSlot']}',
-                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
-                                            ),
-                                          ],
+                                        const SizedBox(width: 14),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                (upcomingAppt['therapistId'] is Map && upcomingAppt['therapistId']['name'] != null)
+                                                    ? upcomingAppt['therapistId']['name']
+                                                    : 'Dr. Rajnish Bariyar',
+                                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5, color: Color(0xFF0F172A)),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Text(
+                                                (upcomingAppt['serviceId'] is Map && upcomingAppt['serviceId']['title'] != null)
+                                                    ? upcomingAppt['serviceId']['title']
+                                                    : 'Physiotherapy Consultation',
+                                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                              ),
+                                              const SizedBox(height: 6),
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.access_time_filled_rounded, size: 12, color: Color(0xFF0F766E)),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    '${upcomingAppt['date']} • ${upcomingAppt['timeSlot']}',
+                                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                                                  ),
+                                                  const Spacer(),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFECFDF5),
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                                                    ),
+                                                    child: Text(
+                                                      (upcomingAppt['status'] ?? 'Confirmed').toString().toUpperCase(),
+                                                      style: const TextStyle(
+                                                        color: Color(0xFF059669),
+                                                        fontSize: 9.5,
+                                                        fontWeight: FontWeight.w800,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
+                                    if (_appointments.length > 1) ...[
+                                      const SizedBox(height: 10),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF8FAFC),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            const Icon(Icons.event_note_rounded, size: 14, color: Color(0xFF0F766E)),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              '+ ${_appointments.length - 1} more scheduled appointment${_appointments.length > 2 ? 's' : ''} • Tap to view all',
+                                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ),
                             )
                           else
@@ -1016,7 +1035,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                     ),
                                   ),
                                   ElevatedButton(
-                                    onPressed: () => context.push('/booking'),
+                                    onPressed: () => context.push('/booking').then((_) => _fetchDashboardData()),
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF0F766E),
                                       foregroundColor: Colors.white,
@@ -1035,8 +1054,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           _buildDoctorShowcaseBanner(),
                           const SizedBox(height: 28),
 
-                          // Frequently Asked Questions Section
-                          const FaqSection(),
+                          // Frequently Asked Questions Section (Dynamic from CMS)
+                          FaqSection(customFaqs: _faqs.isNotEmpty ? _faqs : null),
                           const SizedBox(height: 48),
                         ],
                       ),
@@ -1108,6 +1127,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildDoctorShowcaseBanner() {
+    // Dynamic doctor data extraction
+    dynamic doc1;
+    dynamic doc2;
+    for (final t in _therapists) {
+      if (t is Map) {
+        final name = (t['name'] ?? '').toString().toLowerCase();
+        if (name.contains('rajnish')) {
+          doc1 = t;
+        } else if (name.contains('priyanka')) {
+          doc2 = t;
+        }
+      }
+    }
+    if (doc1 == null && _therapists.isNotEmpty) doc1 = _therapists.first;
+    if (doc2 == null && _therapists.length > 1) doc2 = _therapists.last;
+
+    final doc1Name = doc1 is Map ? (doc1['name']?.toString() ?? 'Dr. Rajnish Bariyar') : 'Dr. Rajnish Bariyar';
+    final doc1Qual = doc1 is Map ? (doc1['qualification']?.toString() ?? 'BPT, MIAP, JSSPT') : 'BPT, MIAP, JSSPT';
+    final doc1Role = doc1 is Map ? (doc1['shortRole']?.toString() ?? doc1['role']?.toString() ?? 'Founder | Joint Secretary') : 'Founder | Joint Secretary';
+
+    final doc2Name = doc2 is Map ? (doc2['name']?.toString() ?? 'Dr. Priyanka Bariyar') : 'Dr. Priyanka Bariyar';
+    final doc2Qual = doc2 is Map ? (doc2['qualification']?.toString() ?? 'BPT, MIAP, JSCPT') : 'BPT, MIAP, JSCPT';
+    final doc2Role = doc2 is Map ? (doc2['shortRole']?.toString() ?? doc2['role']?.toString() ?? 'Co-Founder | Pediatric & Neuro') : 'Co-Founder | Pediatric & Neuro';
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -1116,7 +1159,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF011A18).withOpacity(0.45),
@@ -1127,347 +1170,355 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         border: Border.all(color: const Color(0xFF14B8A6).withOpacity(0.35), width: 1.5),
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Stack(
-          children: [
-            // Background subtle medical circular backdrop
-            Positioned(
-              right: -10,
-              top: 35,
-              child: Container(
-                width: 185,
-                height: 185,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: const Color(0xFF0D5E58).withOpacity(0.5),
-                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.2), width: 2),
-                ),
-              ),
-            ),
-            // Medical '+' Cross watermark
-            Positioned(
-              right: 18,
-              top: 40,
-              child: Icon(
-                Icons.add_rounded,
-                size: 40,
-                color: const Color(0xFF2DD4BF).withOpacity(0.22),
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.all(18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        borderRadius: BorderRadius.circular(26),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Header Badges Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 1. Header Badges Row
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFFF59E0B).withOpacity(0.4),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.star_rounded, size: 13, color: Colors.white),
-                            SizedBox(width: 4),
-                            Text(
-                              'EXPERT CLINICAL DIRECTORS',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 0.6,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF011C1A).withOpacity(0.7),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.access_time_filled_rounded, size: 13, color: Color(0xFFFBBF24)),
-                            SizedBox(width: 5),
-                            Text(
-                              '9 AM – 7 PM',
-                              style: TextStyle(fontSize: 10.5, color: Colors.white, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 2. Middle Row: Doctor Information Cards + Large High-Res Doctors Image
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // Left Content
-                      Expanded(
-                        flex: 6,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              "QuickPhysio24.com",
-                              style: TextStyle(
-                                color: Color(0xFF2DD4BF),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 0.3,
-                              ),
-                            ),
-                            const Text(
-                              "Physiotherapy &\nNeuro Rehab",
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w900,
-                                height: 1.15,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              "Personalized care. Better movement.\nImproved life.",
-                              style: TextStyle(
-                                color: const Color(0xFFCCFBF1).withOpacity(0.85),
-                                fontSize: 10,
-                                height: 1.25,
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Dr. Rajnish Bariyar Card
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF042D2A).withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.45)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF0F766E).withOpacity(0.6),
-                                      border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.6)),
-                                    ),
-                                    child: const Icon(Icons.person_rounded, size: 18, color: Color(0xFF5EEAD4)),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: const [
-                                        Text(
-                                          "Dr. Rajnish Bariyar",
-                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                                        ),
-                                        Text(
-                                          "BPT, MIAP, JSCPT",
-                                          style: TextStyle(color: Color(0xFF99F6E4), fontSize: 8.5, fontWeight: FontWeight.w600),
-                                        ),
-                                        Text(
-                                          "Founder | Joint Secretary, IAP Jharkhand",
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(color: Colors.white70, fontSize: 8),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-
-                            // Dr. Priyanka Bariyar Card
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF042D2A).withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.45)),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF0F766E).withOpacity(0.6),
-                                      border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.6)),
-                                    ),
-                                    child: const Icon(Icons.face_3_rounded, size: 18, color: Color(0xFF5EEAD4)),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: const [
-                                        Text(
-                                          "Dr. Priyanka Bariyar",
-                                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                                        ),
-                                        Text(
-                                          "BPT, MIAP, JSCPT",
-                                          style: TextStyle(color: Color(0xFF99F6E4), fontSize: 8.5, fontWeight: FontWeight.w600),
-                                        ),
-                                        Text(
-                                          "Co-Founder | Pediatric & Neuro Specialist",
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(color: Colors.white70, fontSize: 8),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-
-                      // High-res Image of Both Doctors Standing Together (Waist-Up Prominent View)
-                      Expanded(
-                        flex: 5,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: Container(
-                            height: 245,
-                            alignment: Alignment.topCenter,
-                            child: Image.asset(
-                              'assets/images/doctors_together.png',
-                              fit: BoxFit.cover,
-                              alignment: const Alignment(0.0, -0.85),
-                              errorBuilder: (_, __, ___) => const Icon(Icons.people_alt_rounded, size: 60, color: Colors.white54),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-
-                  // 3. Middle-Bottom 4 Feature Columns Strip
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF011C1A).withOpacity(0.55),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withOpacity(0.07)),
+                      color: const Color(0xFFF59E0B),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFF59E0B).withOpacity(0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
                     child: Row(
-                      children: [
-                        _buildBannerFeature(
-                          icon: Icons.accessibility_new_rounded,
-                          label: 'Personalized\nTreatment Plans',
-                        ),
-                        _buildFeatureDivider(),
-                        _buildBannerFeature(
-                          icon: Icons.psychology_rounded,
-                          label: 'Neuro & Pediatric\nRehabilitation',
-                        ),
-                        _buildFeatureDivider(),
-                        _buildBannerFeature(
-                          icon: Icons.directions_run_rounded,
-                          label: 'Post-Surgery\nRecovery',
-                        ),
-                        _buildFeatureDivider(),
-                        _buildBannerFeature(
-                          icon: Icons.health_and_safety_rounded,
-                          label: 'Pain Relief &\nMobility Support',
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.star_rounded, size: 13, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text(
+                          'EXPERT CLINICAL DIRECTORS',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-
-                  // 4. Action Buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => context.push('/booking'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFF59E0B),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 0,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.calendar_month_rounded, size: 16),
-                              SizedBox(width: 6),
-                              Text(
-                                'Book Appointment',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_rounded, size: 14),
-                            ],
-                          ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4.5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF011C1A).withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.access_time_filled_rounded, size: 12.5, color: Color(0xFFFBBF24)),
+                        SizedBox(width: 4),
+                        Text(
+                          '9 AM – 7 PM',
+                          style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
                         ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => context.push('/service_providers'),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: const Color(0xFF02322E).withOpacity(0.5),
-                            foregroundColor: Colors.white,
-                            side: const BorderSide(color: Color(0xFF2DD4BF), width: 1.2),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(Icons.badge_rounded, size: 16, color: Color(0xFF5EEAD4)),
-                              SizedBox(width: 6),
-                              Text(
-                                'Doctor Profiles',
-                                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Colors.white),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward_rounded, size: 14, color: Colors.white),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+
+              // 2. Middle Row: Doctor Info Cards + Doctors in Centered Circle Frame
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Left Content
+                  Expanded(
+                    flex: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "QuickPhysio24.com",
+                          style: TextStyle(
+                            color: Color(0xFF2DD4BF),
+                            fontSize: 14.5,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        const SizedBox(height: 1),
+                        const Text(
+                          "Physiotherapy &\nNeuro Rehab",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16.5,
+                            fontWeight: FontWeight.w900,
+                            height: 1.15,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          "Personalized care. Better movement.\nImproved life.",
+                          style: TextStyle(
+                            color: const Color(0xFFCCFBF1).withOpacity(0.85),
+                            fontSize: 9,
+                            height: 1.25,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Dr. Rajnish Bariyar Card
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF042D2A).withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.45)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF0F766E).withOpacity(0.6),
+                                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.6)),
+                                ),
+                                child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFF5EEAD4)),
+                              ),
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      doc1Name,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                                    ),
+                                    Text(
+                                      doc1Qual,
+                                      style: const TextStyle(color: Color(0xFF99F6E4), fontSize: 8.5, fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      doc1Role,
+                                      style: const TextStyle(color: Colors.white70, fontSize: 7.8),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+
+                        // Dr. Priyanka Bariyar Card
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF042D2A).withOpacity(0.85),
+                            borderRadius: BorderRadius.circular(13),
+                            border: Border.all(color: const Color(0xFF0D9488).withOpacity(0.45)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: const Color(0xFF0F766E).withOpacity(0.6),
+                                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.6)),
+                                ),
+                                child: const Icon(Icons.face_3_rounded, size: 16, color: Color(0xFF5EEAD4)),
+                              ),
+                              const SizedBox(width: 7),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      doc2Name,
+                                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10.5),
+                                    ),
+                                    Text(
+                                      doc2Qual,
+                                      style: const TextStyle(color: Color(0xFF99F6E4), fontSize: 8.5, fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      doc2Role,
+                                      style: const TextStyle(color: Colors.white70, fontSize: 7.8),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+
+                  // Right Content: Doctors Centered Perfectly on Circular Backdrop
+                  Expanded(
+                    flex: 9,
+                    child: SizedBox(
+                      height: 200,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Centered Teal Circle with soft gradient and delicate border
+                          Container(
+                            width: 145,
+                            height: 145,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFF0E635C).withOpacity(0.75),
+                                  const Color(0xFF053833).withOpacity(0.45),
+                                ],
+                              ),
+                              border: Border.all(
+                                color: const Color(0xFF2DD4BF).withOpacity(0.3),
+                                width: 1.5,
+                              ),
+                            ),
+                          ),
+                          // Medical Cross watermark
+                          Positioned(
+                            right: 4,
+                            top: 14,
+                            child: Icon(
+                              Icons.add_rounded,
+                              size: 28,
+                              color: const Color(0xFF2DD4BF).withOpacity(0.25),
+                            ),
+                          ),
+                          // High-res Doctors Standing Together Image centered on circle & bottom-edge aligned
+                          Positioned.fill(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Image.asset(
+                                'assets/images/doctors_together.png',
+                                height: 185,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.bottomCenter,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                  Icons.people_alt_rounded,
+                                  size: 55,
+                                  color: Colors.white54,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // 3. Middle-Bottom 4 Feature Columns Strip
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF011C1A).withOpacity(0.6),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                ),
+                child: Row(
+                  children: [
+                    _buildBannerFeature(
+                      icon: Icons.accessibility_new_rounded,
+                      label: 'Personalized\nTreatment Plans',
+                    ),
+                    _buildFeatureDivider(),
+                    _buildBannerFeature(
+                      icon: Icons.psychology_rounded,
+                      label: 'Neuro & Pediatric\nRehabilitation',
+                    ),
+                    _buildFeatureDivider(),
+                    _buildBannerFeature(
+                      icon: Icons.directions_run_rounded,
+                      label: 'Post-Surgery\nRecovery',
+                    ),
+                    _buildFeatureDivider(),
+                    _buildBannerFeature(
+                      icon: Icons.health_and_safety_rounded,
+                      label: 'Pain Relief\nMobility Support',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 4. Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => context.push('/booking'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFF59E0B),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        elevation: 0,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.calendar_month_rounded, size: 15),
+                          SizedBox(width: 5),
+                          Text(
+                            'Book Appointment',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 10.5),
+                          ),
+                          SizedBox(width: 3),
+                          Icon(Icons.arrow_forward_rounded, size: 13),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => context.push('/service_providers'),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: const Color(0xFF02322E).withOpacity(0.55),
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0xFF2DD4BF), width: 1.2),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(Icons.badge_rounded, size: 15, color: Color(0xFF5EEAD4)),
+                          SizedBox(width: 5),
+                          Text(
+                            'Doctor Profiles',
+                            style: TextStyle(fontWeight: FontWeight.w800, fontSize: 10.5, color: Colors.white),
+                          ),
+                          SizedBox(width: 3),
+                          Icon(Icons.arrow_forward_rounded, size: 13, color: Colors.white),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1478,16 +1529,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: const Color(0xFF5EEAD4), size: 18),
-          const SizedBox(height: 4),
+          Icon(icon, color: const Color(0xFF5EEAD4), size: 17),
+          const SizedBox(height: 3),
           Text(
             label,
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 8,
+              fontSize: 7.8,
               fontWeight: FontWeight.w600,
-              height: 1.2,
+              height: 1.15,
             ),
           ),
         ],
@@ -1498,8 +1549,146 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildFeatureDivider() {
     return Container(
       width: 1,
-      height: 28,
+      height: 24,
       color: Colors.white12,
+    );
+  }
+
+  // ==========================================
+  // DYNAMIC BANNER ADAPTER BUILDER
+  // ==========================================
+  Widget _buildDynamicBannerCard(Map<String, dynamic> banner, int index, int total) {
+    final title = (banner['title'] ?? 'Physiotherapy Care').toString();
+    final subtitle = (banner['subtitle'] ?? '').toString();
+    final badge = (banner['badge'] ?? '').toString();
+    final ctaText = (banner['ctaText'] ?? 'Explore Now →').toString();
+    final targetRoute = (banner['targetRoute'] ?? '/all_services').toString();
+    final imageUrl = (banner['imageUrl'] ?? '').toString();
+    final numberTag = banner['numberTag']?.toString() ?? '${index + 1}.';
+    final pageTag = '${index + 1}/$total';
+    final id = (banner['id'] ?? '').toString();
+
+    // Theme color palettes
+    Color ctaColor = const Color(0xFF0F766E);
+    Color borderColor = const Color(0xFFFCD34D).withOpacity(0.8);
+    List<Color> gradientColors = const [Color(0xFFFFFDF5), Color(0xFFFEF3C7), Color(0xFFFDE68A)];
+    Color titleColor = const Color(0xFF0F172A);
+    Color subtitleColor = const Color(0xFF475569);
+
+    final theme = (banner['theme'] ?? '').toString().toLowerCase();
+    if (theme == 'sky' || id.contains('recover')) {
+      ctaColor = const Color(0xFF0284C7);
+      borderColor = const Color(0xFF38BDF8).withOpacity(0.8);
+      gradientColors = const [Color(0xFFF0F9FF), Color(0xFFE0F2FE), Color(0xFFBAE6FD)];
+      titleColor = const Color(0xFF0F172A);
+      subtitleColor = const Color(0xFF334155);
+    } else if (theme == 'purple' || id.contains('mobility')) {
+      ctaColor = const Color(0xFF6B21A8);
+      borderColor = const Color(0xFFC084FC).withOpacity(0.8);
+      gradientColors = const [Color(0xFFFAF5FF), Color(0xFFF3E8FF), Color(0xFFE9D5FF)];
+      titleColor = const Color(0xFF3B0764);
+      subtitleColor = const Color(0xFF4C1D95);
+    } else if (theme == 'orange' || id.contains('healthier')) {
+      ctaColor = const Color(0xFFEA580C);
+      borderColor = const Color(0xFFFB923C).withOpacity(0.8);
+      gradientColors = const [Color(0xFFFFF7ED), Color(0xFFFFEDD5), Color(0xFFFED7AA)];
+      titleColor = const Color(0xFF431407);
+      subtitleColor = const Color(0xFF7C2D12);
+    } else if (theme == 'teal' || id.contains('doctor') || id.contains('neuro')) {
+      ctaColor = const Color(0xFF0F766E);
+      borderColor = const Color(0xFF2DD4BF).withOpacity(0.8);
+      gradientColors = const [Color(0xFFF0FDFA), Color(0xFFCCFBF1), Color(0xFF99F6E4)];
+      titleColor = const Color(0xFF134E4A);
+      subtitleColor = const Color(0xFF115E59);
+    }
+
+    // Determine visual
+    Widget visual;
+    if (id == 'banner_1_pain_relief') {
+      visual = _buildSpineGlowVisual();
+    } else if (id == 'banner_2_recover_faster') {
+      visual = _buildRunnerVisual();
+    } else if (id == 'banner_3_better_mobility') {
+      visual = _buildYogaFlexibilityVisual();
+    } else if (id == 'banner_4_healthier_you') {
+      visual = _buildSunriseSilhouetteVisual();
+    } else if (imageUrl.isNotEmpty) {
+      visual = Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Image.network(
+          imageUrl,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => Container(
+            color: ctaColor.withOpacity(0.15),
+            child: Icon(Icons.medical_services_rounded, color: ctaColor, size: 34),
+          ),
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(ctaColor),
+                ),
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      visual = _buildSpineGlowVisual();
+    }
+
+    // Chips
+    List<Map<String, dynamic>> bottomChips = [];
+    if (banner['chips'] is List) {
+      for (final c in (banner['chips'] as List)) {
+        bottomChips.add({'icon': Icons.check_circle_rounded, 'label': c.toString()});
+      }
+    }
+    if (bottomChips.isEmpty) {
+      bottomChips = [
+        {'icon': Icons.verified_rounded, 'label': badge.isNotEmpty ? badge : 'Certified Clinic'},
+        {'icon': Icons.home_repair_service_rounded, 'label': 'Home & Clinic'},
+      ];
+    }
+
+    return _buildModernBannerCard(
+      numberTag: numberTag,
+      pageTag: pageTag,
+      title: title,
+      subtitle: subtitle,
+      ctaText: ctaText,
+      ctaColor: ctaColor,
+      ctaTextColor: Colors.white,
+      gradientColors: gradientColors,
+      borderColor: borderColor,
+      titleColor: titleColor,
+      subtitleColor: subtitleColor,
+      visual: visual,
+      bottomChips: bottomChips,
+      onTap: () {
+        if (targetRoute.isNotEmpty) {
+          context.push(targetRoute);
+        } else {
+          context.push('/all_services');
+        }
+      },
     );
   }
 

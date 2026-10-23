@@ -229,31 +229,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
+      final name = _nameController.text.trim();
+      final mobile = _mobileController.text.trim();
+      final email = _emailController.text.trim();
+      final photo = _photoController.text.trim();
+      final addresses = _addressControllers.map((c) => c.text.trim()).where((a) => a.isNotEmpty).toList();
+      final mainAddr = addresses.isNotEmpty ? addresses.first : _addressController.text.trim();
+      final emergName = _emergNameController.text.trim();
+      final emergPhone = _emergPhoneController.text.trim();
+      final emergRel = _emergRelationController.text.trim();
+      final medHistoryStr = _selectedMedicalHistory.join('|||');
+
       final payload = {
-        'name': _nameController.text.trim(),
+        'name': name,
+        'email': email,
         'gender': _gender,
         'dob': _dob.toIso8601String(),
-        'profilePhoto': _photoController.text.trim(),
+        'profilePhoto': photo,
+        'address': mainAddr,
         'medicalHistory': _selectedMedicalHistory,
         'emergencyContact': {
-          'name': _emergNameController.text.trim(),
-          'phone': _emergPhoneController.text.trim(),
-          'relation': _emergRelationController.text.trim(),
+          'name': emergName,
+          'phone': emergPhone,
+          'relation': emergRel,
         },
-        'savedAddresses': _addressControllers.map((c) => c.text.trim()).where((a) => a.isNotEmpty).toList(),
+        'savedAddresses': addresses.isNotEmpty ? addresses : (mainAddr.isNotEmpty ? [mainAddr] : []),
       };
 
       // Perform profile update/save API request
-      final name = _nameController.text.trim();
-      final mobile = _mobileController.text.trim();
-      final addresses = _addressControllers.map((c) => c.text.trim()).where((a) => a.isNotEmpty).toList();
-
       await _storage.write(key: 'patientName', value: name);
+      await _storage.write(key: 'patientAddress', value: mainAddr);
+      await _storage.write(key: 'patientEmail', value: email);
+      await _storage.write(key: 'patientPhoto', value: photo);
+      await _storage.write(key: 'patientGender', value: _gender);
+      await _storage.write(key: 'patientDob', value: _dob.toIso8601String());
+      await _storage.write(key: 'emergName', value: emergName);
+      await _storage.write(key: 'emergPhone', value: emergPhone);
+      await _storage.write(key: 'emergRel', value: emergRel);
+      await _storage.write(key: 'patientMedicalHistory', value: medHistoryStr);
+
       if (mobile.isNotEmpty) {
         await _storage.write(key: 'userMobile', value: mobile);
-      }
-      if (addresses.isNotEmpty) {
-        await _storage.write(key: 'patientAddress', value: addresses.first);
+        await _storage.write(key: 'patientName_$mobile', value: name);
+        await _storage.write(key: 'patientAddress_$mobile', value: mainAddr);
+        await _storage.write(key: 'patientEmail_$mobile', value: email);
+        await _storage.write(key: 'patientPhoto_$mobile', value: photo);
+        await _storage.write(key: 'patientGender_$mobile', value: _gender);
+        await _storage.write(key: 'patientDob_$mobile', value: _dob.toIso8601String());
+        await _storage.write(key: 'emergName_$mobile', value: emergName);
+        await _storage.write(key: 'emergPhone_$mobile', value: emergPhone);
+        await _storage.write(key: 'emergRel_$mobile', value: emergRel);
+        await _storage.write(key: 'patientMedicalHistory_$mobile', value: medHistoryStr);
       }
 
       try {

@@ -9,6 +9,7 @@ import {
   Building, 
   Coins 
 } from 'lucide-react';
+import EditServiceModal from '@/components/EditServiceModal';
 
 export const revalidate = 0; // Dynamic fetch
 
@@ -40,18 +41,60 @@ async function createServiceAction(formData: FormData) {
   revalidatePath('/admin/services');
 }
 
+// Server Action to update an existing service
+async function updateServiceAction(formData: FormData) {
+  'use server';
+  const serviceId = formData.get('serviceId') as string;
+  const title = formData.get('title') as string;
+  const description = formData.get('description') as string;
+  const category = formData.get('category') as string;
+  const duration = parseInt(formData.get('duration') as string) || 45;
+  const pricingClinic = parseFloat(formData.get('pricingClinic') as string) || 0;
+  const pricingHome = parseFloat(formData.get('pricingHome') as string) || 0;
+  const homeVisitAvailable = formData.get('homeVisitAvailable') === 'on';
+  const clinicVisitAvailable = formData.get('clinicVisitAvailable') === 'on';
+
+  if (!serviceId) return;
+
+  await connectDB();
+  await Service.findByIdAndUpdate(serviceId, {
+    title,
+    description,
+    category,
+    duration,
+    pricingClinic,
+    pricingHome,
+    homeVisitAvailable,
+    clinicVisitAvailable,
+  });
+
+  revalidatePath('/admin/services');
+}
+
+// Server Action to deactivate/delete a service
+async function deleteServiceAction(formData: FormData) {
+  'use server';
+  const serviceId = formData.get('serviceId') as string;
+  if (!serviceId) return;
+
+  await connectDB();
+  await Service.findByIdAndUpdate(serviceId, { isActive: false });
+
+  revalidatePath('/admin/services');
+}
+
 export default async function ServicesPage() {
   await connectDB();
 
-  const services = await Service.find({ isActive: true }).sort({ title: 1 });
+  const services = await Service.find({ isActive: true }).sort({ title: 1 }).lean();
 
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Title block */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Physiotherapy Services</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Physiotherapy Services Management</h1>
         <p className="text-sm text-slate-400 font-medium mt-1">
-          Add, configure, and review clinical treatments and home consultation rates.
+          Add, edit, configure, and manage clinical treatments, session durations, and consultation rates.
         </p>
       </div>
 
@@ -60,7 +103,7 @@ export default async function ServicesPage() {
         {/* Left Column: Create Service Form */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm self-start">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
               <Plus size={18} />
             </div>
             <h3 className="font-bold text-slate-800 text-lg">Add Service</h3>
@@ -74,7 +117,7 @@ export default async function ServicesPage() {
                 name="title" 
                 required 
                 placeholder="Post-Pregnancy Core Rehab" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
               />
             </div>
 
@@ -85,7 +128,7 @@ export default async function ServicesPage() {
                 required 
                 rows={3}
                 placeholder="Brief summary describing the treatment purpose..." 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500 resize-none"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500 resize-none"
               />
             </div>
 
@@ -97,7 +140,7 @@ export default async function ServicesPage() {
                   name="category" 
                   required 
                   placeholder="Rehabilitation" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
               <div>
@@ -108,7 +151,7 @@ export default async function ServicesPage() {
                   required 
                   min="5"
                   placeholder="60" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
             </div>
@@ -121,7 +164,7 @@ export default async function ServicesPage() {
                   name="pricingClinic" 
                   required 
                   placeholder="800" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
               <div>
@@ -131,7 +174,7 @@ export default async function ServicesPage() {
                   name="pricingHome" 
                   required 
                   placeholder="1200" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
             </div>
@@ -145,7 +188,7 @@ export default async function ServicesPage() {
                   name="clinicVisitAvailable" 
                   id="clinicCheck" 
                   defaultChecked
-                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500"
                 />
                 <label htmlFor="clinicCheck" className="text-sm font-medium text-slate-600 cursor-pointer">
                   Clinic Consultation Available
@@ -158,7 +201,7 @@ export default async function ServicesPage() {
                   name="homeVisitAvailable" 
                   id="homeCheck" 
                   defaultChecked
-                  className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500"
+                  className="w-4 h-4 text-teal-600 border-slate-300 rounded focus:ring-teal-500"
                 />
                 <label htmlFor="homeCheck" className="text-sm font-medium text-slate-600 cursor-pointer">
                   Home Visit Available
@@ -168,7 +211,7 @@ export default async function ServicesPage() {
 
             <button 
               type="submit" 
-              className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-indigo-100"
+              className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-teal-100"
             >
               Add Service Catalog
             </button>
@@ -186,12 +229,12 @@ export default async function ServicesPage() {
           ) : (
             services.map((service: any) => (
               <div 
-                key={service._id} 
+                key={service._id.toString()} 
                 className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
               >
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100/35 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                    <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
                       {service.category}
                     </span>
                     <div className="flex items-center gap-1 text-slate-400 text-xs font-semibold">
@@ -204,17 +247,36 @@ export default async function ServicesPage() {
                   <p className="text-xs text-slate-400 leading-relaxed line-clamp-3 font-medium">{service.description}</p>
                 </div>
 
-                <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
-                  <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <Building size={14} className={service.clinicVisitAvailable ? 'text-indigo-600' : 'text-slate-300'} />
-                      <span>Clinic: {service.clinicVisitAvailable ? `₹${service.pricingClinic}` : 'N/A'}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <MapPin size={14} className={service.homeVisitAvailable ? 'text-emerald-600' : 'text-slate-300'} />
-                      <span>Home: {service.homeVisitAvailable ? `₹${service.pricingHome}` : 'N/A'}</span>
+                <div>
+                  <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <Building size={14} className={service.clinicVisitAvailable ? 'text-teal-600' : 'text-slate-300'} />
+                        <span>Clinic: {service.clinicVisitAvailable ? `₹${service.pricingClinic}` : 'N/A'}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MapPin size={14} className={service.homeVisitAvailable ? 'text-emerald-600' : 'text-slate-300'} />
+                        <span>Home: {service.homeVisitAvailable ? `₹${service.pricingHome}` : 'N/A'}</span>
+                      </div>
                     </div>
                   </div>
+
+                  {/* Edit & Delete Action Buttons */}
+                  <EditServiceModal
+                    service={{
+                      _id: service._id.toString(),
+                      title: String(service.title),
+                      description: String(service.description),
+                      category: String(service.category),
+                      duration: Number(service.duration),
+                      pricingClinic: Number(service.pricingClinic),
+                      pricingHome: Number(service.pricingHome),
+                      homeVisitAvailable: Boolean(service.homeVisitAvailable),
+                      clinicVisitAvailable: Boolean(service.clinicVisitAvailable),
+                    }}
+                    onUpdate={updateServiceAction}
+                    onDelete={deleteServiceAction}
+                  />
                 </div>
 
               </div>

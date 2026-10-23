@@ -6,11 +6,11 @@ import {
   Mail, 
   Phone, 
   GraduationCap, 
-  Sliders, 
   Plus, 
   CalendarDays, 
   Star 
 } from 'lucide-react';
+import EditTherapistModal from '@/components/EditTherapistModal';
 
 export const revalidate = 0; // Dynamic fetch
 
@@ -36,10 +36,55 @@ async function onboardTherapistAction(formData: FormData) {
     qualification,
     experience,
     specialization,
-    workingHours: { start: '09:00', end: '18:00' },
-    workingDays: [1, 2, 3, 4, 5], // Monday-Friday
+    workingHours: { start: '09:00', end: '19:00' },
+    workingDays: [0, 1, 2, 3, 4, 5, 6], // Monday-Sunday
     isActive: true,
   });
+
+  revalidatePath('/admin/therapists');
+}
+
+// Server Action to update an existing therapist
+async function updateTherapistAction(formData: FormData) {
+  'use server';
+  const therapistId = formData.get('therapistId') as string;
+  const name = formData.get('name') as string;
+  const email = formData.get('email') as string;
+  const mobile = formData.get('mobile') as string;
+  const qualification = formData.get('qualification') as string;
+  const experience = parseInt(formData.get('experience') as string) || 0;
+  const specializationStr = formData.get('specialization') as string;
+  const startTime = (formData.get('startTime') as string) || '09:00';
+  const endTime = (formData.get('endTime') as string) || '19:00';
+
+  if (!therapistId) return;
+
+  const specialization = specializationStr
+    ? specializationStr.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  await connectDB();
+  await Therapist.findByIdAndUpdate(therapistId, {
+    name,
+    email,
+    mobile,
+    qualification,
+    experience,
+    specialization,
+    workingHours: { start: startTime, end: endTime },
+  });
+
+  revalidatePath('/admin/therapists');
+}
+
+// Server Action to deactivate/delete a therapist
+async function deleteTherapistAction(formData: FormData) {
+  'use server';
+  const therapistId = formData.get('therapistId') as string;
+  if (!therapistId) return;
+
+  await connectDB();
+  await Therapist.findByIdAndUpdate(therapistId, { isActive: false });
 
   revalidatePath('/admin/therapists');
 }
@@ -47,7 +92,7 @@ async function onboardTherapistAction(formData: FormData) {
 export default async function TherapistsPage() {
   await connectDB();
 
-  const therapists = await Therapist.find({ isActive: true }).sort({ name: 1 });
+  const therapists = await Therapist.find({ isActive: true }).sort({ name: 1 }).lean();
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -55,7 +100,7 @@ export default async function TherapistsPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-800">Therapist Management</h1>
         <p className="text-sm text-slate-400 font-medium mt-1">
-          Manage practitioner details, onboard staff, and review schedule availability settings.
+          Manage practitioner details, onboard staff, edit doctor schedules, and review specialties.
         </p>
       </div>
 
@@ -64,7 +109,7 @@ export default async function TherapistsPage() {
         {/* Left Column: Onboard Form */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm self-start">
           <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
               <Plus size={18} />
             </div>
             <h3 className="font-bold text-slate-800 text-lg">Onboard Therapist</h3>
@@ -78,7 +123,7 @@ export default async function TherapistsPage() {
                 name="name" 
                 required 
                 placeholder="Dr. Rajesh Kumar" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
               />
             </div>
 
@@ -90,7 +135,7 @@ export default async function TherapistsPage() {
                   name="email" 
                   required 
                   placeholder="rajesh@clinic.com" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
               <div>
@@ -100,7 +145,7 @@ export default async function TherapistsPage() {
                   name="mobile" 
                   required 
                   placeholder="9110912544" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
             </div>
@@ -112,7 +157,7 @@ export default async function TherapistsPage() {
                 name="qualification" 
                 required 
                 placeholder="MPT (Sports Medicine), BPT" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
               />
             </div>
 
@@ -125,13 +170,13 @@ export default async function TherapistsPage() {
                   required 
                   min="0"
                   placeholder="5" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                 />
               </div>
               <div>
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Working Days</label>
                 <div className="text-xs font-bold text-slate-500 bg-slate-100/50 p-2.5 rounded-xl border border-slate-200/40 mt-1 select-none">
-                  Mon - Fri (Default)
+                  Mon - Sun (Daily)
                 </div>
               </div>
             </div>
@@ -142,13 +187,13 @@ export default async function TherapistsPage() {
                 type="text" 
                 name="specialization" 
                 placeholder="Dry Needling, Joint Mobilization, Posture Correction" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-indigo-500"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
               />
             </div>
 
             <button 
               type="submit" 
-              className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-indigo-100"
+              className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-teal-100"
             >
               Add Therapist
             </button>
@@ -166,14 +211,14 @@ export default async function TherapistsPage() {
           ) : (
             therapists.map((therapist: any) => (
               <div 
-                key={therapist._id} 
+                key={therapist._id.toString()} 
                 className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
               >
                 <div className="space-y-4">
                   {/* Avatar and rating header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-700 font-extrabold text-base border border-indigo-100">
+                      <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-base border border-teal-100">
                         {therapist.name.charAt(0)}
                       </div>
                       <div>
@@ -204,7 +249,7 @@ export default async function TherapistsPage() {
                     <div className="flex items-center gap-2">
                       <CalendarDays size={16} className="text-slate-400" />
                       <span className="text-xs">
-                        Hrs: {therapist.workingHours.start} - {therapist.workingHours.end}
+                        Hrs: {therapist.workingHours?.start || '09:00'} - {therapist.workingHours?.end || '19:00'}
                       </span>
                     </div>
                   </div>
@@ -216,13 +261,33 @@ export default async function TherapistsPage() {
                     {therapist.specialization.map((spec: string, idx: number) => (
                       <span 
                         key={idx} 
-                        className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100/35 px-2 py-0.5 rounded-md"
+                        className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2 py-0.5 rounded-md"
                       >
                         {spec}
                       </span>
                     ))}
                   </div>
                 )}
+
+                {/* Edit & Delete Action Buttons */}
+                <EditTherapistModal
+                  therapist={{
+                    _id: therapist._id.toString(),
+                    name: String(therapist.name),
+                    email: String(therapist.email),
+                    mobile: String(therapist.mobile),
+                    qualification: String(therapist.qualification),
+                    experience: Number(therapist.experience),
+                    specialization: therapist.specialization ? Array.from(therapist.specialization).map(String) : [],
+                    workingHours: {
+                      start: String(therapist.workingHours?.start || '09:00'),
+                      end: String(therapist.workingHours?.end || '19:00'),
+                    },
+                    ratingAverage: Number(therapist.ratingAverage || 5),
+                  }}
+                  onUpdate={updateTherapistAction}
+                  onDelete={deleteTherapistAction}
+                />
 
               </div>
             ))

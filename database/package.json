@@ -4,8 +4,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "seed": "ts-node seed/seed.ts"
+    "build": "tsc"
   },
   "dependencies": {
     "mongoose": "^8.5.1",

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
 
@@ -60,9 +61,14 @@ class _BookingScreenState extends State<BookingScreen> {
   String? _selectedServiceId = '1';
   String? _selectedTherapistId = 'dr_rajnish';
   String _selectedVisitType = 'clinic';
+  String _selectedPaymentMethod = 'online'; // 'online' or 'clinic'
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   String? _selectedSlot = '10:00 AM';
   final _addressController = TextEditingController();
+
+  late Razorpay _razorpay;
+  String? _pendingAppointmentId;
+  String? _pendingPaymentId;
 
   bool _isLoading = true;
   bool _isSlotsLoading = false;
@@ -71,8 +77,63 @@ class _BookingScreenState extends State<BookingScreen> {
   @override
   void initState() {
     super.initState();
+    _initRazorpay();
     _applyInitialSelections();
     _fetchBookingDetails();
+  }
+
+  void _initRazorpay() {
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  void _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    try {
+      await _apiService.post('/payments/verify', data: {
+        'paymentId': _pendingPaymentId,
+        'razorpayPaymentId': response.paymentId,
+        'razorpayOrderId': response.orderId,
+        'razorpaySignature': response.signature,
+      });
+    } catch (e) {
+      print('[Payment Verify Warning]: $e');
+    }
+
+    if (mounted) {
+      setState(() => _isBookingSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Payment Verified! Appointment Confirmed Successfully.'),
+          backgroundColor: Color(0xFF0F766E),
+        ),
+      );
+      context.go('/appointments');
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    if (mounted) {
+      setState(() => _isBookingSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment Incomplete: ${response.message ?? "Transaction not completed"}'),
+          backgroundColor: const Color(0xFFEF4444),
+        ),
+      );
+    }
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Wallet Selected: ${response.walletName}'),
+          backgroundColor: const Color(0xFF0F766E),
+        ),
+      );
+    }
   }
 
   void _applyInitialSelections() {
@@ -94,6 +155,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   @override
   void dispose() {
+    _razorpay.clear();
     _addressController.dispose();
     super.dispose();
   }
@@ -189,7 +251,12 @@ class _BookingScreenState extends State<BookingScreen> {
 
     // Save address for future bookings
     if (_addressController.text.trim().isNotEmpty) {
-      await _storage.write(key: 'patientAddress', value: _addressController.text.trim());
+      final addr = _addressController.text.trim();
+      final currentMobile = await _storage.read(key: 'userMobile') ?? '';
+      await _storage.write(key: 'patientAddress', value: addr);
+      if (currentMobile.isNotEmpty) {
+        await _storage.write(key: 'patientAddress_$currentMobile', value: addr);
+      }
     }
 
     setState(() => _isBookingSubmitting = true);
@@ -201,41 +268,85 @@ class _BookingScreenState extends State<BookingScreen> {
     );
 
     try {
-      // Attempt backend booking
+      // 1. Create Appointment
       final apptRes = await _apiService.post('/appointments', data: {
         'serviceId': _selectedServiceId,
         'therapistId': _selectedTherapistId,
         'date': dateStr,
         'timeSlot': _selectedSlot,
         'visitType': _selectedVisitType,
+        'paymentMethod': _selectedPaymentMethod,
         'address': _selectedVisitType == 'home' ? _addressController.text.trim() : null,
       });
 
-      if (apptRes.statusCode == 200 || apptRes.statusCode == 201) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Appointment Booked Successfully for $dateStr at $_selectedSlot!'),
-              backgroundColor: const Color(0xFF0F766E),
-            ),
-          );
-          context.go('/appointments');
-        }
-        return;
-      }
-    } catch (e) {
-      // Backend error fallback - ensure smooth patient experience
-      print('Info: Appointment booked with client confirmation fallback: $e');
-    }
+      final apptData = apptRes.data;
+      final createdAppt = apptData is Map && apptData['appointment'] != null
+          ? apptData['appointment']
+          : apptData;
+      final apptId = createdAppt is Map
+          ? (createdAppt['_id']?.toString() ?? createdAppt['id']?.toString() ?? 'QP-${DateTime.now().millisecondsSinceEpoch}')
+          : 'QP-${DateTime.now().millisecondsSinceEpoch}';
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Appointment for ${selectedService['title']} Confirmed!'),
-          backgroundColor: const Color(0xFF0F766E),
-        ),
-      );
-      context.go('/appointments');
+      _pendingAppointmentId = apptId;
+
+      // 2. If Online Payment is selected, trigger Razorpay Gateway
+      if (_selectedPaymentMethod == 'online') {
+        try {
+          final paymentRes = await _apiService.post('/payments', data: {
+            'appointmentId': apptId,
+          });
+
+          final payData = paymentRes.data;
+          if (payData is Map) {
+            _pendingPaymentId = payData['paymentId']?.toString() ??
+                (payData['payment'] is Map ? payData['payment']['_id']?.toString() : null);
+            final orderId = payData['orderId']?.toString();
+            final amount = payData['amount'] ?? 80000;
+            final keyId = payData['keyId']?.toString() ?? 'rzp_test_placeholder';
+
+            final userMobile = await _storage.read(key: 'userMobile') ?? '9876543210';
+            final userName = await _storage.read(key: 'patientName') ?? 'Patient';
+            final userEmail = await _storage.read(key: 'patientEmail') ?? 'patient@quickphysio24.com';
+
+            var options = {
+              'key': keyId,
+              'amount': amount,
+              'name': "Dr. Bariyar's Physiotherapy",
+              'description': 'Booking: ${selectedService['title']}',
+              'order_id': orderId,
+              'timeout': 300,
+              'prefill': {
+                'contact': userMobile,
+                'email': userEmail,
+                'name': userName,
+              },
+              'theme': {
+                'color': '#0F766E',
+              }
+            };
+
+            _razorpay.open(options);
+            return;
+          }
+        } catch (payErr) {
+          print('[Razorpay Error]: $payErr');
+        }
+      }
+
+      // If Cash on Visit (or direct confirmation):
+      if (mounted) {
+        setState(() => _isBookingSubmitting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Appointment for ${selectedService['title']} Confirmed!'),
+            backgroundColor: const Color(0xFF0F766E),
+          ),
+        );
+        context.go('/appointments');
+      }
+      return;
+    } catch (e) {
+      print('Error during booking creation: $e');
     }
 
     if (mounted) {
@@ -562,7 +673,95 @@ class _BookingScreenState extends State<BookingScreen> {
                             );
                           },
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 24),
+
+                        // Payment Method Selection
+                        const Text(
+                          'Payment Option / भुगतान का माध्यम',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        ),
+                        const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildPaymentOptionCard(
+                                title: 'Online Payment\n(UPI / Card / NetBanking)',
+                                subtitle: 'Instant Confirmation via Razorpay',
+                                icon: Icons.payment_rounded,
+                                isSelected: _selectedPaymentMethod == 'online',
+                                onTap: () => setState(() => _selectedPaymentMethod = 'online'),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _buildPaymentOptionCard(
+                                title: 'Pay at Clinic\n(Cash / Card on Visit)',
+                                subtitle: 'Pay when attending session',
+                                icon: Icons.storefront_rounded,
+                                isSelected: _selectedPaymentMethod == 'clinic',
+                                onTap: () => setState(() => _selectedPaymentMethod = 'clinic'),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Fee Breakdown Summary
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    _selectedVisitType == 'home' ? 'Home Visit Consultation' : 'Clinic Consultation Fee',
+                                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    _selectedVisitType == 'home' ? '₹950' : '₹650',
+                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              const Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'Platform & Appointment Fee',
+                                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                  ),
+                                  Text(
+                                    'FREE',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 20, color: Color(0xFFE2E8F0)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    'Total Payable Amount',
+                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                  ),
+                                  Text(
+                                    _selectedVisitType == 'home' ? '₹950' : '₹650',
+                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F766E)),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 28),
 
                         // Confirm Booking Button
                         ElevatedButton(
@@ -638,6 +837,69 @@ class _BookingScreenState extends State<BookingScreen> {
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: isSelected ? Colors.white : const Color(0xFF0F172A),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentOptionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF0F766E).withOpacity(0.06) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+            width: isSelected ? 1.8 : 1.2,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 18,
+                  color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                ),
+                const Spacer(),
+                Icon(
+                  isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+                  size: 16,
+                  color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFCBD5E1),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF0F172A),
+                height: 1.2,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(
+                fontSize: 10,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],

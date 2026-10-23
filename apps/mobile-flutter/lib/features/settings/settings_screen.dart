@@ -331,6 +331,88 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
 
+                  _buildSectionHeader('Account Session'),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                                content: const Text(
+                                  'Are you sure you want to log out? You can log back in anytime with your mobile number.',
+                                  style: TextStyle(color: Color(0xFF64748B), height: 1.4),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Cancel', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () async {
+                                      Navigator.pop(ctx);
+                                      await _storage.delete(key: 'accessToken');
+                                      await _storage.delete(key: 'userMobile');
+                                      await _storage.delete(key: 'patientName');
+                                      await _storage.delete(key: 'patientAddress');
+                                      if (mounted) {
+                                        context.go('/login');
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFEF4444),
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      elevation: 0,
+                                    ),
+                                    child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                          child: Row(
+                            children: const [
+                              CircleAvatar(
+                                backgroundColor: Color(0xFFFEF2F2),
+                                child: Icon(Icons.logout_rounded, color: Color(0xFFEF4444), size: 20),
+                              ),
+                              SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Log Out / Switch Account',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFEF4444)),
+                                    ),
+                                    SizedBox(height: 2),
+                                    Text(
+                                      'Sign in with a different mobile number',
+                                      style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                   const SizedBox(height: 36),
                 ],
               ),

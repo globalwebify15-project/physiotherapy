@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 class FaqSection extends StatelessWidget {
-  const FaqSection({super.key});
+  final List<Map<String, String>>? customFaqs;
 
-  final List<Map<String, String>> _faqs = const [
+  const FaqSection({super.key, this.customFaqs});
+
+  static const List<Map<String, String>> _defaultFaqs = [
     {
       'question': 'What are the clinic timings and working hours?',
       'hindi': 'क्लिनिक का समय क्या है?',
@@ -27,12 +29,13 @@ class FaqSection extends StatelessWidget {
     {
       'question': 'How can I book or reschedule an appointment?',
       'hindi': 'अपॉइंटमेंट कैसे बुक या बदलें?',
-      'answer': 'You can book directly via the app booking screen by choosing your service, preferred doctor, and time slot, or call the clinic at +91 98765 43210.',
+      'answer': 'You can book directly via the app booking screen by choosing your service, preferred doctor, and time slot, or call the clinic at +91 91109 12544 / +91 96932 33447.',
     },
   ];
 
   @override
   Widget build(BuildContext context) {
+    final faqs = (customFaqs != null && customFaqs!.isNotEmpty) ? customFaqs! : _defaultFaqs;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -62,9 +65,9 @@ class FaqSection extends StatelessWidget {
         ListView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _faqs.length,
+          itemCount: faqs.length,
           itemBuilder: (context, index) {
-            final faq = _faqs[index];
+            final faq = faqs[index];
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),

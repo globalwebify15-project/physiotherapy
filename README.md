@@ -12,7 +12,6 @@ This is a modern monorepo containing the Physiotherapy Appointment Booking Platf
   - `shared-types/` - Shared TypeScript interfaces and types.
 - `database/`
   - `models/` - Mongoose schemas and models.
-  - `seed/` - Database seeding scripts.
 - `docs/`
   - `api/` - HTTP request files and API specifications.
 

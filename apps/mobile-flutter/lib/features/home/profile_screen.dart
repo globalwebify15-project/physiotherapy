@@ -20,16 +20,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _picker = ImagePicker();
   bool _isLoading = true;
 
-  // Patient Profile Fields
-  String _name = 'Amarjeet Pandey';
-  String _mobile = '9334306358';
-  String _email = 'amarjeet@globalwebify.com';
+  // Patient Profile Fields - Dynamic State
+  String _name = '';
+  String _mobile = '';
+  String _email = '';
   String _photoUrl = '';
   String _gender = 'male';
-  String _dob = '1995-06-15T00:00:00.000Z';
-  String _address = 'Ashok Nagar, Ranchi, Jharkhand';
-  String _emergencyContact = 'Pooja Pandey (+91 91109 12544)';
-  List<String> _medicalHistory = ['Post-Surgery Rehab', 'Routine Physiotherapy Checkup'];
+  String _dob = '2000-01-01T00:00:00.000Z';
+  String _address = '';
+  String _emergencyContact = '';
+  List<String> _medicalHistory = [];
 
   @override
   void initState() {
@@ -52,7 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildInitialsAvatar() {
     final parts = _name.trim().split(' ').where((e) => e.isNotEmpty).toList();
-    String initials = 'AP';
+    String initials = 'QP';
     if (parts.length >= 2) {
       initials = '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
@@ -103,21 +103,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    // 1. Load from storage
-    final cachedName = await _storage.read(key: 'patientName');
-    final cachedMobile = await _storage.read(key: 'userMobile') ?? await _storage.read(key: 'patientMobile');
-    final cachedPhoto = await _storage.read(key: 'patientPhoto');
-    final cachedEmail = await _storage.read(key: 'patientEmail');
-    final cachedAddress = await _storage.read(key: 'patientAddress');
-    final historyRaw = await _storage.read(key: 'patientMedicalHistory');
+    // 1. Load active user's mobile first
+    final currentMobile = await _storage.read(key: 'userMobile') ?? '';
+    final cachedName = await _storage.read(key: 'patientName_$currentMobile') ?? await _storage.read(key: 'patientName');
+    final cachedPhoto = await _storage.read(key: 'patientPhoto_$currentMobile') ?? await _storage.read(key: 'patientPhoto');
+    final cachedEmail = await _storage.read(key: 'patientEmail_$currentMobile') ?? await _storage.read(key: 'patientEmail');
+    final cachedAddress = await _storage.read(key: 'patientAddress_$currentMobile') ?? await _storage.read(key: 'patientAddress');
+    final historyRaw = await _storage.read(key: 'patientMedicalHistory_$currentMobile') ?? await _storage.read(key: 'patientMedicalHistory');
+    final emergName = await _storage.read(key: 'emergName_$currentMobile') ?? await _storage.read(key: 'emergName');
+    final emergPhone = await _storage.read(key: 'emergPhone_$currentMobile') ?? await _storage.read(key: 'emergPhone');
 
     if (mounted) {
       setState(() {
+        if (currentMobile.isNotEmpty) _mobile = currentMobile;
         if (cachedName != null && cachedName.isNotEmpty) _name = cachedName;
-        if (cachedMobile != null && cachedMobile.isNotEmpty) _mobile = cachedMobile;
         if (cachedPhoto != null) _photoUrl = cachedPhoto;
         if (cachedEmail != null && cachedEmail.isNotEmpty) _email = cachedEmail;
         if (cachedAddress != null && cachedAddress.isNotEmpty) _address = cachedAddress;
+        if (emergName != null && emergName.isNotEmpty) {
+          _emergencyContact = emergPhone != null && emergPhone.isNotEmpty ? '$emergName ($emergPhone)' : emergName;
+        }
         if (historyRaw != null && historyRaw.isNotEmpty) {
           _medicalHistory = historyRaw.split('|||').where((e) => e.isNotEmpty).toList();
         }
@@ -129,33 +134,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final response = await _apiService.get('/patients');
       if (response.statusCode == 200 && response.data['patient'] != null) {
         final patient = response.data['patient'];
-        final fetchedName = patient['name'];
-        final fetchedMobile = patient['userId'] is Map ? (patient['userId']['mobile'] ?? '') : '';
+        final fetchedName = patient['name'] ?? '';
+        final fetchedMobile = patient['userId'] is Map ? (patient['userId']['mobile'] ?? currentMobile) : currentMobile;
         final fetchedEmail = patient['userId'] is Map ? (patient['userId']['email'] ?? '') : '';
         final photo = patient['profilePhoto'] ?? '';
         final addr = patient['address'] ?? '';
         final gender = patient['gender'] ?? 'male';
         final dob = patient['dob'] ?? '';
 
-        if (fetchedName != null) await _storage.write(key: 'patientName', value: fetchedName);
-        if (fetchedMobile.isNotEmpty) await _storage.write(key: 'userMobile', value: fetchedMobile);
-        if (photo.isNotEmpty) await _storage.write(key: 'patientPhoto', value: photo);
-
+        String ecFormatted = '';
         if (patient['emergencyContact'] is Map) {
           final ecName = patient['emergencyContact']['name'] ?? '';
           final ecPhone = patient['emergencyContact']['phone'] ?? '';
-          if (ecName.isNotEmpty) _emergencyContact = '$ecName ($ecPhone)';
+          if (ecName.isNotEmpty) ecFormatted = ecPhone.isNotEmpty ? '$ecName ($ecPhone)' : ecName;
         }
 
         if (mounted) {
           setState(() {
-            if (fetchedName != null && fetchedName.isNotEmpty) _name = fetchedName;
-            if (fetchedMobile.isNotEmpty) _mobile = fetchedMobile;
-            if (fetchedEmail.isNotEmpty) _email = fetchedEmail;
-            if (photo.isNotEmpty) _photoUrl = photo;
-            if (addr.isNotEmpty) _address = addr;
+            _name = fetchedName.isNotEmpty ? fetchedName : (cachedName ?? 'Patient');
+            _mobile = fetchedMobile.isNotEmpty ? fetchedMobile : currentMobile;
+            _email = fetchedEmail;
+            _photoUrl = photo;
+            _address = addr;
             _gender = gender;
             _dob = dob;
+            if (ecFormatted.isNotEmpty) _emergencyContact = ecFormatted;
             if (patient['medicalHistory'] != null) {
               _medicalHistory = List<String>.from(patient['medicalHistory']);
             }

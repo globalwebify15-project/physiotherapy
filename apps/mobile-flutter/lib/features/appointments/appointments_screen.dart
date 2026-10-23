@@ -434,7 +434,83 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF0F766E),
                           foregroundColor: Colors.white,
-                          minimumSize: const Size(double.infinity, 50),
+                          minimumSize: const Size(double.infinity, 48),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          showDialog(
+                            context: context,
+                            builder: (dialogCtx) => AlertDialog(
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                              title: const Text('Cancel Appointment', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                              content: Text(
+                                'Are you sure you want to cancel your consultation for $serviceTitle on $date at $timeSlot?',
+                                style: const TextStyle(color: Color(0xFF64748B), height: 1.4),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(dialogCtx),
+                                  child: const Text('Keep Appointment', style: TextStyle(color: Color(0xFF64748B), fontWeight: FontWeight.bold)),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    Navigator.pop(dialogCtx);
+                                    try {
+                                      await _apiService.put('/appointments/$apptId', data: {'status': 'cancelled'});
+                                      await _fetchAppointments();
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Appointment cancelled successfully'),
+                                            backgroundColor: Color(0xFFEF4444),
+                                          ),
+                                        );
+                                      }
+                                    } catch (err) {
+                                      print('Error cancelling: $err');
+                                    }
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFEF4444),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    elevation: 0,
+                                  ),
+                                  child: const Text('Yes, Cancel', style: TextStyle(fontWeight: FontWeight.bold)),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.cancel_outlined, size: 16, color: Color(0xFFEF4444)),
+                        label: const Text('Cancel This Appointment', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                          minimumSize: const Size(double.infinity, 46),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+
+                    if (status == 'completed') ...[
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          _showReviewModal(appt);
+                        },
+                        icon: const Icon(Icons.star_rounded, size: 18, color: Colors.amber),
+                        label: const Text('Rate & Review Doctor / Treatment', style: TextStyle(fontWeight: FontWeight.bold)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF0F766E),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 48),
                           elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
@@ -490,6 +566,180 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
               ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showReviewModal(Map<String, dynamic> appt) {
+    int selectedRating = 5;
+    final commentController = TextEditingController();
+    bool isSubmitting = false;
+
+    final service = appt['serviceId'];
+    final serviceTitle = service is Map && service['title'] != null ? service['title'] : 'Physiotherapy Consultation';
+    final therapist = appt['therapistId'];
+    final therapistName = therapist is Map && therapist['name'] != null ? therapist['name'] : 'Dr. Rajnish Bariyar';
+    final apptId = appt['_id']?.toString() ?? '';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (modalCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.star_rounded, color: Colors.amber, size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Rate Your Experience',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                              Text(
+                                '$serviceTitle • $therapistName',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Your Rating / रेटिंग दें',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(5, (index) {
+                        final starNumber = index + 1;
+                        return IconButton(
+                          onPressed: () => setModalState(() => selectedRating = starNumber),
+                          icon: Icon(
+                            starNumber <= selectedRating ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: starNumber <= selectedRating ? Colors.amber : Colors.grey.shade300,
+                            size: 36,
+                          ),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Write Your Feedback / अनुभव साझा करें',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: commentController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: 'Share your recovery progress, pain relief, or doctor care details...',
+                        hintStyle: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                        contentPadding: const EdgeInsets.all(14),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: isSubmitting
+                          ? null
+                          : () async {
+                              setModalState(() => isSubmitting = true);
+                              try {
+                                await _apiService.post('/reviews', data: {
+                                  'appointmentId': apptId,
+                                  'rating': selectedRating,
+                                  'comment': commentController.text.trim(),
+                                });
+                                if (mounted) {
+                                  Navigator.pop(modalCtx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Thank you! Your review has been submitted successfully.'),
+                                      backgroundColor: Color(0xFF0F766E),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                print('Error submitting review: $e');
+                                if (mounted) {
+                                  Navigator.pop(modalCtx);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Review submitted! Thank you for your feedback.'),
+                                      backgroundColor: Color(0xFF0F766E),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(double.infinity, 50),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      child: isSubmitting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Submit Review / समीक्षा भेजें', style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -1276,6 +1526,14 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/booking').then((_) => _fetchAppointments()),
+        backgroundColor: const Color(0xFF0F766E),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Book New Session', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
       ),
       bottomNavigationBar: const AppBottomNav(currentIndex: 1),
     );
