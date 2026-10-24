@@ -6,8 +6,16 @@ import { getAuthenticatedUser } from '@/utils/auth';
 export async function GET() {
   try {
     await connectDB();
-    const services = await Service.find({ isActive: true });
-    return NextResponse.json({ success: true, services });
+    const services = await Service.find({ isActive: true }).lean();
+    return NextResponse.json(
+      { success: true, services },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Error fetching services:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

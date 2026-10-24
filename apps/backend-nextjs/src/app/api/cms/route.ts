@@ -11,16 +11,32 @@ export async function GET(request: NextRequest) {
     const key = url.searchParams.get('key');
 
     if (key) {
-      const cmsBlock = await CMS.findOne({ key });
+      const cmsBlock = await CMS.findOne({ key }).lean();
       if (!cmsBlock) {
         return NextResponse.json({ error: `CMS configuration for key '${key}' not found` }, { status: 404 });
       }
-      return NextResponse.json({ success: true, key, content: cmsBlock.content });
+      return NextResponse.json(
+        { success: true, key, content: cmsBlock.content },
+        {
+          status: 200,
+          headers: {
+            'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+          },
+        }
+      );
     }
 
     // Return all if no key specified
-    const cmsBlocks = await CMS.find();
-    return NextResponse.json({ success: true, cmsBlocks });
+    const cmsBlocks = await CMS.find().lean();
+    return NextResponse.json(
+      { success: true, cmsBlocks },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Error fetching CMS:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

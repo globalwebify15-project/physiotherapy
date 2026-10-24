@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:dio/dio.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -20,7 +21,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _apiService = ApiService();
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   // Dynamic Dashboard Data
   String _patientName = 'Patient';
@@ -144,50 +145,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     try {
-      // 1. Fetch Patient details
-      try {
-        final patientRes = await _apiService.get('/patients');
-        if (patientRes.statusCode == 200 && patientRes.data['patient'] != null) {
-          final fetchedName = patientRes.data['patient']['name']?.toString() ?? '';
-          final fetchedAddress = patientRes.data['patient']['address']?.toString() ?? '';
+      // Execute all dashboard sync operations concurrently in parallel
+      final results = await Future.wait([
+        _apiService.get('/patients').catchError((_) => Response(requestOptions: RequestOptions(path: '/patients'), statusCode: 500)),
+        _apiService.get('/appointments').catchError((_) => Response(requestOptions: RequestOptions(path: '/appointments'), statusCode: 500)),
+        _apiService.get('/services').catchError((_) => Response(requestOptions: RequestOptions(path: '/services'), statusCode: 500)),
+        _apiService.get('/therapists').catchError((_) => Response(requestOptions: RequestOptions(path: '/therapists'), statusCode: 500)),
+        _apiService.fetchCmsBanners().catchError((_) => ApiService.defaultBanners),
+        _apiService.fetchCmsFaqs().catchError((_) => ApiService.defaultFaqs),
+      ]);
 
-          if (mounted) {
-            setState(() {
-              if (fetchedName.isNotEmpty) _patientName = fetchedName;
-              if (fetchedAddress.isNotEmpty) _locationAddress = fetchedAddress;
-            });
-          }
-        }
-      } catch (e) {
-        // Fallback to storage
-      }
-
-      // 2. Fetch Appointments, Services & Therapists
-      final apptsRes = await _apiService.get('/appointments');
-      final servicesRes = await _apiService.get('/services');
-      List<dynamic> fetchedTherapists = [];
-      try {
-        final therapistsRes = await _apiService.get('/therapists');
-        if (therapistsRes.data != null && therapistsRes.data['therapists'] != null) {
-          fetchedTherapists = therapistsRes.data['therapists'] as List<dynamic>;
-        }
-      } catch (_) {}
-
-      // 3. Fetch Dynamic CMS Banners & FAQs from MongoDB Atlas
-      List<Map<String, dynamic>> fetchedBanners = [];
-      List<Map<String, String>> fetchedFaqs = [];
-      try {
-        fetchedBanners = await _apiService.fetchCmsBanners();
-        fetchedFaqs = await _apiService.fetchCmsFaqs();
-      } catch (e) {
-        print('[CMS Dashboard Fetch Error, using core fallbacks]: $e');
-      }
+      final patientRes = results[0] as Response;
+      final apptsRes = results[1] as Response;
+      final servicesRes = results[2] as Response;
+      final therapistsRes = results[3] as Response;
+      final fetchedBanners = results[4] as List<Map<String, dynamic>>;
+      final fetchedFaqs = results[5] as List<Map<String, String>>;
 
       if (mounted) {
         setState(() {
-          _appointments = apptsRes.data['appointments'] ?? [];
-          _services = servicesRes.data['services'] ?? [];
-          _therapists = fetchedTherapists;
+          if (patientRes.statusCode == 200 && patientRes.data != null && patientRes.data['patient'] != null) {
+            final fetchedName = patientRes.data['patient']['name']?.toString() ?? '';
+            final fetchedAddress = patientRes.data['patient']['address']?.toString() ?? '';
+            if (fetchedName.isNotEmpty) _patientName = fetchedName;
+            if (fetchedAddress.isNotEmpty) _locationAddress = fetchedAddress;
+          }
+
+          if (apptsRes.statusCode == 200 && apptsRes.data != null && apptsRes.data['appointments'] != null) {
+            _appointments = apptsRes.data['appointments'] ?? [];
+          }
+
+          if (servicesRes.statusCode == 200 && servicesRes.data != null && servicesRes.data['services'] != null) {
+            _services = servicesRes.data['services'] ?? [];
+          }
+
+          if (therapistsRes.statusCode == 200 && therapistsRes.data != null && therapistsRes.data['therapists'] != null) {
+            _therapists = therapistsRes.data['therapists'] ?? [];
+          }
+
           if (fetchedBanners.isNotEmpty) _banners = fetchedBanners;
           if (fetchedFaqs.isNotEmpty) _faqs = fetchedFaqs;
           _isLoading = false;

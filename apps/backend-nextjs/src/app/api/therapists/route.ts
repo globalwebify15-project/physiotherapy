@@ -6,8 +6,16 @@ import { getAuthenticatedUser } from '@/utils/auth';
 export async function GET() {
   try {
     await connectDB();
-    const therapists = await Therapist.find({ isActive: true });
-    return NextResponse.json({ success: true, therapists });
+    const therapists = await Therapist.find({ isActive: true }).lean();
+    return NextResponse.json(
+      { success: true, therapists },
+      {
+        status: 200,
+        headers: {
+          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+        },
+      }
+    );
   } catch (error: any) {
     console.error('Error fetching therapists:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

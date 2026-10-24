@@ -6,15 +6,11 @@ class ApiService {
   final Dio _dio = Dio();
   final _storage = const FlutterSecureStorage();
 
-  // Intelligent API Base URL configuration:
-  // Android emulator: http://10.0.2.2:4000/api
-  // LAN device: http://192.168.1.15:4000/api
-  // Web/desktop: http://localhost:4000/api
-  // Production: https://physiotherapy-backend-nextjs.vercel.app/api
-  static const String _baseUrl = 'http://10.0.2.2:4000/api';
+  // Live Production Base URL:
+  static const String _baseUrl = 'https://physiotherapy-backend-nextjs.vercel.app/api';
   
   // Set to false to prioritize live Next.js backend & MongoDB Atlas database,
-  // with automatic fallback to local cache if device is offline.
+  // with automatic fast fallback to local cache if device is offline.
   static const bool _useMockMode = false;
 
   // Seed default appointment for demonstration
@@ -273,8 +269,8 @@ class ApiService {
 
   ApiService() {
     _dio.options.baseUrl = _baseUrl;
-    _dio.options.connectTimeout = const Duration(seconds: 10);
-    _dio.options.receiveTimeout = const Duration(seconds: 10);
+    _dio.options.connectTimeout = const Duration(milliseconds: 3000);
+    _dio.options.receiveTimeout = const Duration(milliseconds: 3000);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -329,8 +325,6 @@ class ApiService {
         print('[ApiService Live GET Failed, Falling back to local offline cache]: $e');
       }
     }
-
-    await Future.delayed(const Duration(milliseconds: 200)); // Simulate network latency
     final currentMobile = await _storage.read(key: 'userMobile') ?? '';
       
       if (path.contains('/appointments/slots')) {
@@ -485,8 +479,6 @@ class ApiService {
         print('[ApiService Live POST Failed, Falling back to local offline cache]: $e');
       }
     }
-
-    await Future.delayed(const Duration(milliseconds: 200)); // Simulate network latency
 
       if (path.startsWith('/auth/otp/send')) {
         return Response(
