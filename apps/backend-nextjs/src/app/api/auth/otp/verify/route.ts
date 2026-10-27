@@ -1,29 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, User, Patient } from 'database';
 import { signAccessToken, signRefreshToken } from '@/utils/auth';
+import { getApps } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
-    const { mobile, otp } = await request.json();
+    const { mobile: inputMobile, otp, idToken } = await request.json();
 
-    if (!mobile || !otp) {
-      return NextResponse.json({ error: 'Mobile number and OTP are required' }, { status: 400 });
+    let targetMobile = inputMobile;
+
+    // If a Firebase Auth idToken is provided, verify it to extract the authenticated phone number
+    if (idToken) {
+      try {
+        const apps = getApps();
+        if (apps.length > 0) {
+          const decoded = await getAuth(apps[0]!).verifyIdToken(idToken);
+          if (decoded.phone_number) {
+            targetMobile = decoded.phone_number.replace(/^\+91/, '');
+          }
+        }
+      } catch (fbErr) {
+        console.warn('[AUTH] Firebase idToken verification fallback to input mobile:', fbErr);
+      }
     }
 
-    // Basic OTP validation bypass for development (accept any 6-digit code or specific code)
-    if (otp.length !== 6) {
+    if (!targetMobile || (!otp && !idToken)) {
+      return NextResponse.json({ error: 'Mobile number and verification code are required' }, { status: 400 });
+    }
+
+    // Basic OTP validation bypass for development or when idToken is absent
+    if (!idToken && otp && otp.length !== 6) {
       return NextResponse.json({ error: 'Invalid OTP format' }, { status: 400 });
     }
 
     // Find or create User
-    let user = await User.findOne({ mobile });
+    let user = await User.findOne({ mobile: targetMobile });
     let isNewUser = false;
 
     if (!user) {
       isNewUser = true;
       user = await User.create({
-        mobile,
+        mobile: targetMobile,
         role: 'patient',
         isActive: true,
       });

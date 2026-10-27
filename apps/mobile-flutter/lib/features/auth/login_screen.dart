@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/api_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -12,6 +14,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _mobileController = TextEditingController();
   final _apiService = ApiService();
+  final _storage = const FlutterSecureStorage();
   bool _isLoading = false;
 
   @override
@@ -30,26 +33,82 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     setState(() => _isLoading = true);
+    final fullNumber = mobile.startsWith('+') ? mobile : '+91$mobile';
 
     try {
-      final response = await _apiService.post('/auth/otp/send', data: {
-        'mobile': mobile,
-      });
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullNumber,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Instant auto-retrieval / auto-verification on Android
+          try {
+            final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+            final idToken = await userCred.user?.getIdToken();
 
-      if (response.statusCode == 200) {
-        if (mounted) {
+            final response = await _apiService.post('/auth/otp/verify', data: {
+              'mobile': mobile,
+              'otp': credential.smsCode ?? 'auto_verified',
+              'idToken': idToken,
+            });
+
+            if (response.statusCode == 200 && mounted) {
+              final data = response.data;
+              await _storage.write(key: 'accessToken', value: data['accessToken']);
+              await _storage.write(key: 'refreshToken', value: data['refreshToken']);
+              await _storage.write(key: 'patientId', value: data['patient']?['id'] ?? 'patient_$mobile');
+              await _storage.write(key: 'userMobile', value: mobile);
+
+              if (data['isNewUser'] == true) {
+                context.go('/register');
+              } else {
+                context.go('/home');
+              }
+            }
+          } catch (autoErr) {
+            print('[Firebase Auto Verification]: $autoErr');
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.message ?? 'Verification failed (${e.code}). Please try again.'),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            context.push('/otp?mobile=$mobile&verificationId=$verificationId');
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          // Auto retrieval timeout reached
+        },
+      );
+    } catch (e) {
+      // Fallback: If Firebase throws (e.g. offline or unconfigured), use backend test route
+      try {
+        final response = await _apiService.post('/auth/otp/send', data: {
+          'mobile': mobile,
+        });
+
+        if (response.statusCode == 200 && mounted) {
           context.push('/otp?mobile=$mobile');
         }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: ${e.toString()}')),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     }
   }

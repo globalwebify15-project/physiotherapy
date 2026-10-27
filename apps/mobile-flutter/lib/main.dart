@@ -51,7 +51,8 @@ class PhysioApp extends ConsumerWidget {
           path: '/otp',
           builder: (context, state) {
             final mobile = state.uri.queryParameters['mobile'] ?? '';
-            return OtpScreen(mobile: mobile);
+            final verificationId = state.uri.queryParameters['verificationId'];
+            return OtpScreen(mobile: mobile, verificationId: verificationId);
           },
         ),
         GoRoute(

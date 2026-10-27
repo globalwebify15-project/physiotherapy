@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/api_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String mobile;
-  const OtpScreen({super.key, required this.mobile});
+  final String? verificationId;
+  const OtpScreen({super.key, required this.mobile, this.verificationId});
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -15,7 +17,14 @@ class _OtpScreenState extends State<OtpScreen> {
   final _otpController = TextEditingController();
   final _apiService = ApiService();
   final _storage = const FlutterSecureStorage();
+  late String? _currentVerificationId;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentVerificationId = widget.verificationId;
+  }
 
   @override
   void dispose() {
@@ -33,18 +42,44 @@ class _OtpScreenState extends State<OtpScreen> {
     }
 
     setState(() => _isLoading = true);
+    String? idToken;
 
+    // 1. Verify with Firebase if verificationId is present
+    if (_currentVerificationId != null && _currentVerificationId!.isNotEmpty) {
+      try {
+        final credential = PhoneAuthProvider.credential(
+          verificationId: _currentVerificationId!,
+          smsCode: otp,
+        );
+        final userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+        idToken = await userCred.user?.getIdToken();
+      } catch (authErr) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Invalid code: Please check the SMS and try again.'),
+              backgroundColor: Colors.red.shade700,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // 2. Sync / generate session with backend
     try {
       final response = await _apiService.post('/auth/otp/verify', data: {
         'mobile': widget.mobile,
         'otp': otp,
+        'idToken': idToken,
       });
 
       if (response.statusCode == 200) {
         final data = response.data;
         await _storage.write(key: 'accessToken', value: data['accessToken']);
         await _storage.write(key: 'refreshToken', value: data['refreshToken']);
-        await _storage.write(key: 'patientId', value: data['patient']['id']);
+        await _storage.write(key: 'patientId', value: data['patient']?['id'] ?? 'patient_${widget.mobile}');
         await _storage.write(key: 'userMobile', value: widget.mobile);
 
         if (mounted) {
@@ -58,13 +93,56 @@ class _OtpScreenState extends State<OtpScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Invalid code: ${e.toString()}')),
+          SnackBar(content: Text('Authentication error: ${e.toString()}')),
         );
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _resendCode() async {
+    final fullNumber = widget.mobile.startsWith('+') ? widget.mobile : '+91${widget.mobile}';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Resending code to $fullNumber...'),
+        backgroundColor: const Color(0xFF0F766E),
+      ),
+    );
+
+    try {
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: fullNumber,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          await _verifyOtp();
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(e.message ?? 'Resend failed: ${e.code}')),
+            );
+          }
+        },
+        codeSent: (String newVerificationId, int? resendToken) {
+          setState(() {
+            _currentVerificationId = newVerificationId;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Verification code sent successfully!'),
+                backgroundColor: Color(0xFF059669),
+              ),
+            );
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {},
+      );
+    } catch (e) {
+      print('Resend error: $e');
     }
   }
 
@@ -201,14 +279,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
               Center(
                 child: TextButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Verification code resent to +91 ${widget.mobile}'),
-                        backgroundColor: const Color(0xFF0F766E),
-                      ),
-                    );
-                  },
+                  onPressed: _isLoading ? null : _resendCode,
                   style: TextButton.styleFrom(foregroundColor: const Color(0xFF64748B)),
                   child: RichText(
                     text: const TextSpan(

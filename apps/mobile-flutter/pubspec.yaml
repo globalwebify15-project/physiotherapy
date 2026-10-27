@@ -20,8 +20,9 @@ dependencies:
   dio: ^5.5.0
   flutter_secure_storage: ^9.2.2
 
-  # Firebase Cloud Messaging
+  # Firebase Services (Auth & Messaging)
   firebase_core: ^3.12.1
+  firebase_auth: ^5.5.1
   firebase_messaging: ^15.2.4
 
   # Payments
