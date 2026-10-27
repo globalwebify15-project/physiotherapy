@@ -5,6 +5,7 @@ export interface IUser extends Document {
   email?: string;
   role: 'patient' | 'admin' | 'superadmin' | 'receptionist' | 'therapist';
   passwordHash?: string; // only for admin/staff/therapists who login with passwords
+  fcmTokens?: string[];
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -20,6 +21,7 @@ const UserSchema: Schema = new Schema(
       default: 'patient',
     },
     passwordHash: { type: String },
+    fcmTokens: [{ type: String }],
     isActive: { type: Boolean, default: true },
   },
   { timestamps: true }

@@ -54,19 +54,60 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
     // Role enforcement
     if (user.role === 'patient') {
+      const patient = await Patient.findOne({ userId: user.userId });
+      if (!patient || appointment.patientId.toString() !== patient._id.toString()) {
+        return NextResponse.json({ error: 'Forbidden: You can only manage your own appointments' }, { status: 403 });
+      }
+
       // Patients can only reschedule or cancel their own appointments
       if (status && !['cancelled'].includes(status)) {
         return NextResponse.json({ error: 'Patients can only request cancellation' }, { status: 403 });
       }
+
       if (date || timeSlot) {
-        // Rescheduling
-        appointment.date = date || appointment.date;
-        appointment.timeSlot = timeSlot || appointment.timeSlot;
+        const newDate = date || appointment.date;
+        const newSlot = timeSlot || appointment.timeSlot;
+
+        // Check if assigned therapist is available for new slot
+        if (appointment.therapistId) {
+          const conflict = await Appointment.findOne({
+            _id: { $ne: id },
+            therapistId: appointment.therapistId,
+            date: newDate,
+            timeSlot: newSlot,
+            status: { $ne: 'cancelled' },
+          });
+
+          if (conflict) {
+            return NextResponse.json(
+              { error: 'The assigned therapist is already booked for this new slot. Please select another time.' },
+              { status: 409 }
+            );
+          }
+        }
+
+        appointment.date = newDate;
+        appointment.timeSlot = newSlot;
         appointment.statusTimeline.push({
           status: appointment.status,
-          note: note || 'Appointment rescheduled by patient.',
+          note: note || `Rescheduled by patient to ${newDate} at ${newSlot}.`,
         });
+
+        // Notify clinic admin
+        try {
+          const adminUser = await User.findOne({ role: 'superadmin' });
+          if (adminUser) {
+            await createNotification(
+              adminUser._id,
+              'Appointment Rescheduled',
+              `Patient ${patient.name} rescheduled their appointment to ${newDate} (${newSlot}).`,
+              'reminder',
+              { appointmentId: appointment._id }
+            );
+          }
+        } catch (_) {}
       }
+
       if (status === 'cancelled') {
         appointment.status = 'cancelled';
         appointment.statusTimeline.push({

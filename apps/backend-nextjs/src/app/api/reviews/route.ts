@@ -2,20 +2,40 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Review, Appointment, Patient, Therapist } from 'database';
 import { getAuthenticatedUser } from '@/utils/auth';
 
-// GET /api/reviews - Retrieve all reviews or filter by therapistId
+// GET /api/reviews - Retrieve reviews (public, by therapist, or current patient's own reviews)
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
     const url = new URL(request.url);
     const therapistId = url.searchParams.get('therapistId');
-    const filter: any = { isModerated: true }; // Only return moderated (approved) reviews by default
+    const isMyParam = url.searchParams.get('my') === 'true';
+    const isAllParam = url.searchParams.get('all') === 'true';
 
-    if (therapistId) {
+    let filter: any = { isModerated: true };
+
+    if (isMyParam) {
+      const user = await getAuthenticatedUser(request);
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      const patient = await Patient.findOne({ userId: user.userId });
+      if (!patient) {
+        return NextResponse.json({ success: true, reviews: [] });
+      }
+      filter = { patientId: patient._id };
+    } else if (isAllParam) {
+      const user = await getAuthenticatedUser(request, ['admin', 'superadmin', 'receptionist']);
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      filter = {};
+    } else if (therapistId) {
       filter.therapistId = therapistId;
     }
 
     const reviews = await Review.find(filter)
       .populate('patientId', 'name profilePhoto')
+      .populate('therapistId', 'name qualification')
       .populate('serviceId', 'title')
       .sort({ createdAt: -1 });
 

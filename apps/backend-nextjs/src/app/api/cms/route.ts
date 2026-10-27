@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const key = url.searchParams.get('key');
 
     if (key) {
-      const cmsBlock = await CMS.findOne({ key }).lean();
+      const cmsBlock: any = await CMS.findOne({ key }).lean();
       if (!cmsBlock) {
         return NextResponse.json({ error: `CMS configuration for key '${key}' not found` }, { status: 404 });
       }

@@ -55,6 +55,8 @@ android/app/flutter_bootstrap.properties
 *.key
 google-services.json
 GoogleService-Info.plist
+*firebase-adminsdk*.json
+firebase-admin.json
 
 # Temp/Scratch files
 scratch/

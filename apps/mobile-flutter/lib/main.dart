@@ -16,8 +16,12 @@ import 'features/home/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/theme_provider.dart';
 import 'features/auth/register_screen.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().initialize();
+
   runApp(
     const ProviderScope(
       child: PhysioApp(),

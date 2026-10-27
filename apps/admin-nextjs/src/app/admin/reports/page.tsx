@@ -1,5 +1,5 @@
 import React from 'react';
-import { connectDB, Payment, Appointment, Patient, Therapist, Service } from 'database';
+import { connectDB, Payment, Appointment, Patient, Therapist, Service, User } from 'database';
 import { 
   FileSpreadsheet, 
   TrendingUp, 
@@ -88,6 +88,30 @@ export default async function ReportsPage({
     })
   );
 
+  // 4. Patient Registry Report Data
+  const patients = await Patient.find()
+    .populate({ path: 'userId', model: User })
+    .sort({ createdAt: -1 });
+
+  const patientRows = await Promise.all(
+    patients.map(async (p: any) => {
+      const apptCount = await Appointment.countDocuments({ patientId: p._id });
+      const lastAppt = await Appointment.findOne({ patientId: p._id }).sort({ date: -1 });
+      return {
+        'Patient ID': p._id.toString().slice(-6),
+        'Full Name': p.name,
+        'Mobile Number': p.userId?.mobile || 'N/A',
+        'Gender': p.gender || 'Not specified',
+        'Date of Birth': p.dob ? new Date(p.dob).toISOString().split('T')[0] : 'N/A',
+        'Emergency Contact': p.emergencyContact?.phone ? `${p.emergencyContact.name} (${p.emergencyContact.phone})` : 'N/A',
+        'Medical Conditions': (p.medicalHistory || []).join('; ') || 'None reported',
+        'Total Bookings': apptCount,
+        'Last Visit Date': lastAppt?.date || 'None',
+        'Registered On': p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : 'N/A',
+      };
+    })
+  );
+
   // Active data selection
   let activeData: any[] = [];
   let reportTitle = '';
@@ -105,6 +129,10 @@ export default async function ReportsPage({
     activeData = therapistRows;
     reportTitle = 'Therapist Productivity & Rating Report';
     filename = 'Therapists_Report';
+  } else if (currentType === 'patients') {
+    activeData = patientRows;
+    reportTitle = 'Registered Patient Directory Report';
+    filename = 'Patients_Report';
   }
 
   // Summary Metrics
@@ -195,6 +223,16 @@ export default async function ReportsPage({
               }`}
             >
               🩺 Therapist Performance ({therapistRows.length})
+            </Link>
+            <Link
+              href="/admin/reports?type=patients"
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                currentType === 'patients'
+                  ? 'bg-teal-600 text-white shadow-sm shadow-teal-100'
+                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200/60'
+              }`}
+            >
+              👤 Patient Registry ({patientRows.length})
             </Link>
           </div>
 
