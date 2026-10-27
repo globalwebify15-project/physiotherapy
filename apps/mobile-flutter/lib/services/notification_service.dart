@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'api_service.dart';
 
 @pragma('vm:entry-point')
@@ -77,14 +78,23 @@ class NotificationService {
   }
 
   /// Sends the device token to the backend API
-  Future<void> registerTokenWithBackend(String token) async {
+  Future<void> registerTokenWithBackend([String? token]) async {
+    final t = token ?? _fcmToken;
+    if (t == null || t.isEmpty) return;
+
     try {
+      final storage = FlutterSecureStorage();
+      final currentMobile = await storage.read(key: 'userMobile') ?? '';
+
       await _apiService.post(
         '/notifications/token',
-        data: {'token': token},
+        data: {
+          'token': t,
+          'mobile': currentMobile,
+        },
       );
       if (kDebugMode) {
-        print('[FCM TOKEN REGISTERED WITH BACKEND]');
+        print('[FCM TOKEN REGISTERED WITH BACKEND for $currentMobile]');
       }
     } catch (e) {
       if (kDebugMode) {

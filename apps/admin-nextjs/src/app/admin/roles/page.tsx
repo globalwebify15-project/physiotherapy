@@ -1,6 +1,7 @@
 import React from 'react';
 import { connectDB, User } from 'database';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { 
   ShieldCheck, 
@@ -18,34 +19,54 @@ import {
 
 export const revalidate = 0; // Dynamic real-time fetch
 
-// Server Action: Create new clinic staff account
+// Server Action: Create new clinic staff account or promote existing account
 async function createStaffAction(formData: FormData) {
   'use server';
   const email = (formData.get('email') as string)?.trim().toLowerCase();
-  const mobile = (formData.get('mobile') as string)?.trim();
+  let mobile = (formData.get('mobile') as string)?.trim() || '';
   const password = formData.get('password') as string;
   const role = (formData.get('role') as string) || 'receptionist';
 
-  if (!email || !mobile || !password) return;
+  if (!email || !mobile || !password) {
+    redirect('/admin/roles?error=' + encodeURIComponent('Please provide email, mobile number, and password.'));
+  }
+
+  // Normalize mobile format: strip whitespace, dashes, parens
+  mobile = mobile.replace(/[\s\-\(\)]/g, '');
+  if (!mobile.startsWith('+') && mobile.length === 10) {
+    mobile = '+91' + mobile;
+  }
 
   await connectDB();
   const existing = await User.findOne({ $or: [{ email }, { mobile }] });
-  if (existing) {
-    return;
-  }
-
+  
   const salt = await bcrypt.genSalt(10);
   const passwordHash = await bcrypt.hash(password, salt);
 
-  await User.create({
-    email,
-    mobile,
-    role,
-    passwordHash,
-    isActive: true,
-  });
+  if (existing) {
+    // If user already exists (e.g. registered as patient or tester), upgrade/update their credentials to the requested staff role
+    existing.role = role;
+    existing.email = email;
+    existing.mobile = mobile;
+    existing.passwordHash = passwordHash;
+    existing.isActive = true;
+    await existing.save();
 
-  revalidatePath('/admin/roles');
+    revalidatePath('/admin/roles');
+    redirect('/admin/roles?success=' + encodeURIComponent(`Account (${email}) already existed and has been successfully upgraded to ${role.toUpperCase()} with the new credentials.`));
+  } else {
+    // Create brand new staff user
+    await User.create({
+      email,
+      mobile,
+      role,
+      passwordHash,
+      isActive: true,
+    });
+
+    revalidatePath('/admin/roles');
+    redirect('/admin/roles?success=' + encodeURIComponent(`New staff account (${email}) successfully provisioned as ${role.toUpperCase()}.`));
+  }
 }
 
 // Server Action: Update user role or toggle status
@@ -71,8 +92,16 @@ async function updateStaffAction(formData: FormData) {
   revalidatePath('/admin/roles');
 }
 
-export default async function RolesPage() {
+export default async function RolesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ success?: string; error?: string }>;
+}) {
   await connectDB();
+
+  const params = searchParams ? await searchParams : {};
+  const successMsg = params.success;
+  const errorMsg = params.error;
 
   // Fetch all staff users (exclude patient accounts)
   const staffUsers = await User.find({
@@ -105,6 +134,21 @@ export default async function RolesPage() {
           </p>
         </div>
       </div>
+
+      {/* Action Feedback Alerts */}
+      {successMsg && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex items-center gap-3 text-emerald-900 shadow-xs animate-fade-in">
+          <CheckCircle2 size={20} className="text-emerald-600 flex-shrink-0" />
+          <div className="flex-1 text-xs font-bold leading-relaxed">{successMsg}</div>
+        </div>
+      )}
+
+      {errorMsg && (
+        <div className="p-4 bg-rose-50 border border-rose-200/80 rounded-2xl flex items-center gap-3 text-rose-900 shadow-xs animate-fade-in">
+          <ShieldAlert size={20} className="text-rose-600 flex-shrink-0" />
+          <div className="flex-1 text-xs font-bold leading-relaxed">{errorMsg}</div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Create Staff Member Card */}

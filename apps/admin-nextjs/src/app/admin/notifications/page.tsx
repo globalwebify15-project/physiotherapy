@@ -50,6 +50,24 @@ async function broadcastNotificationAction(formData: FormData) {
     });
   }
 
+  // Trigger push dispatch through backend FCM service
+  try {
+    const backendUrl = process.env.BASE_URL || 'https://physiotherapy-backend-nextjs.vercel.app';
+    await fetch(`${backendUrl.replace(/\/$/, '')}/api/notifications`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        targetType,
+        userId: targetType !== 'all' ? targetType : undefined,
+        title,
+        body,
+        type: notifType,
+      }),
+    });
+  } catch (pushErr) {
+    console.warn('[FCM PUSH DISPATCH WARNING]:', pushErr);
+  }
+
   revalidatePath('/admin/notifications');
 }
 

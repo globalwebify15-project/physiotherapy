@@ -7,17 +7,32 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
     const user = await getAuthenticatedUser(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const body = await request.json();
+    const token = body?.token;
+    const mobile = body?.mobile;
 
-    const { token } = await request.json();
     if (!token || typeof token !== 'string') {
       return NextResponse.json({ error: 'FCM token string is required' }, { status: 400 });
     }
 
+    let targetUserId = user?.userId;
+
+    if (!targetUserId && mobile) {
+      const cleanMobile = mobile.toString().replace(/^\+91/, '').trim();
+      const dbUser = await User.findOne({
+        $or: [{ mobile: cleanMobile }, { mobile: `+91${cleanMobile}` }, { mobile }]
+      });
+      if (dbUser) {
+        targetUserId = dbUser._id;
+      }
+    }
+
+    if (!targetUserId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     // Add token if not already present
-    await User.findByIdAndUpdate(user.userId, {
+    await User.findByIdAndUpdate(targetUserId, {
       $addToSet: { fcmTokens: token.trim() },
     });
 

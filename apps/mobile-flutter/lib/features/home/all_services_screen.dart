@@ -20,6 +20,9 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
   String _selectedCategory = 'All';
   String _searchQuery = '';
 
+  final _apiService = ApiService();
+  bool _isLoadingLive = false;
+
   final List<String> _categories = [
     'All',
     'Neurological Rehab',
@@ -259,6 +262,71 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
     _tabController.addListener(() {
       if (mounted) setState(() {});
     });
+    _loadLiveServices();
+  }
+
+  Future<void> _loadLiveServices() async {
+    try {
+      final res = await _apiService.get('/services');
+      if (res.statusCode == 200 && res.data != null && res.data['services'] != null) {
+        final List<dynamic> list = res.data['services'];
+        if (list.isNotEmpty && mounted) {
+          final List<Map<String, dynamic>> liveMapped = [];
+          for (final item in list) {
+            if (item is Map) {
+              final title = item['title']?.toString() ?? '';
+              if (title.isEmpty) continue;
+              final cat = item['category']?.toString() ?? 'General Care';
+              final desc = item['description']?.toString() ?? 'Comprehensive therapy and care customized to patient requirements.';
+              final dur = item['duration'] is num ? (item['duration'] as num).toInt() : 45;
+              final pClinic = item['pricingClinic'] is num ? (item['pricingClinic'] as num).toDouble() : 650.0;
+              final pHome = item['pricingHome'] is num ? (item['pricingHome'] as num).toDouble() : 950.0;
+              final clinicAvail = item['clinicVisitAvailable'] ?? true;
+              final homeAvail = item['homeVisitAvailable'] ?? true;
+              
+              final isPriyanka = cat.toLowerCase().contains('pediatric') || 
+                                 cat.toLowerCase().contains('women') || 
+                                 title.toLowerCase().contains('bell') ||
+                                 title.toLowerCase().contains('facial') ||
+                                 title.toLowerCase().contains('cp') ||
+                                 title.toLowerCase().contains('autism');
+              final doctor = item['doctor']?.toString() ?? (isPriyanka ? 'Dr. Priyanka Bariyar' : 'Dr. Rajnish Bariyar');
+
+              liveMapped.add({
+                '_id': item['_id']?.toString(),
+                'title': title,
+                'category': cat,
+                'description': desc,
+                'duration': dur,
+                'pricingClinic': pClinic,
+                'pricingHome': pHome,
+                'clinicVisitAvailable': clinicAvail,
+                'homeVisitAvailable': homeAvail,
+                'doctor': doctor,
+                'isLive': true,
+              });
+
+              if (!_categories.contains(cat)) {
+                _categories.add(cat);
+              }
+            }
+          }
+
+          if (liveMapped.isNotEmpty) {
+            final liveTitles = liveMapped.map((s) => s['title'].toString().toLowerCase().trim()).toSet();
+            final remainingDefaults = _catalogServices.where((s) => !liveTitles.contains((s['title'] ?? '').toString().toLowerCase().trim())).toList();
+
+            setState(() {
+              _catalogServices
+                ..clear()
+                ..addAll([...liveMapped, ...remainingDefaults]);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading live services: $e');
+    }
   }
 
   @override
@@ -885,10 +953,13 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _filteredServices.length,
-      itemBuilder: (context, index) {
+    return RefreshIndicator(
+      onRefresh: _loadLiveServices,
+      color: const Color(0xFF0F766E),
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _filteredServices.length,
+        itemBuilder: (context, index) {
         final item = _filteredServices[index];
         return Container(
           margin: const EdgeInsets.only(bottom: 14),
@@ -966,8 +1037,9 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
           ),
         );
       },
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildDoctorsList() {
     if (_filteredDoctors.isEmpty) {

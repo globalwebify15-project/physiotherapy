@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/api_service.dart';
+import '../../services/notification_service.dart';
 
 class OtpScreen extends StatefulWidget {
   final String mobile;
@@ -81,6 +82,7 @@ class _OtpScreenState extends State<OtpScreen> {
         await _storage.write(key: 'refreshToken', value: data['refreshToken']);
         await _storage.write(key: 'patientId', value: data['patient']?['id'] ?? 'patient_${widget.mobile}');
         await _storage.write(key: 'userMobile', value: widget.mobile);
+        NotificationService().registerTokenWithBackend();
 
         if (mounted) {
           if (data['isNewUser'] == true) {

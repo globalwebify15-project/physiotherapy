@@ -177,6 +177,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
           if (servicesRes.statusCode == 200 && servicesRes.data != null && servicesRes.data['services'] != null) {
             _services = servicesRes.data['services'] ?? [];
+            if (_services.isNotEmpty) {
+              final liveList = <Map<String, dynamic>>[];
+              for (final s in _services) {
+                if (s is Map) {
+                  final title = s['title']?.toString() ?? '';
+                  if (title.isEmpty) continue;
+                  final cat = s['category']?.toString() ?? 'General Care';
+                  final pClinic = s['pricingClinic'] is num ? (s['pricingClinic'] as num).toInt() : 650;
+                  final pHome = s['pricingHome'] is num ? (s['pricingHome'] as num).toInt() : 950;
+                  final desc = s['description']?.toString() ?? '';
+                  final isPriyanka = cat.toLowerCase().contains('pediatric') || cat.toLowerCase().contains('women');
+                  final doc = s['doctor']?.toString() ?? (isPriyanka ? 'Dr. Priyanka Bariyar' : 'Dr. Rajnish Bariyar');
+
+                  liveList.add({
+                    '_id': s['_id']?.toString(),
+                    'title': title,
+                    'category': cat,
+                    'clinicPrice': pClinic,
+                    'homePrice': pHome,
+                    'description': desc,
+                    'doctor': doc,
+                    'isLive': true,
+                  });
+                }
+              }
+
+              if (liveList.isNotEmpty) {
+                final liveTitles = liveList.map((e) => e['title'].toString().toLowerCase().trim()).toSet();
+                final remainingDefaults = _quickServices.where((e) => !liveTitles.contains((e['title'] ?? '').toString().toLowerCase().trim())).toList();
+                _quickServices
+                  ..clear()
+                  ..addAll([...liveList, ...remainingDefaults]);
+              }
+            }
           }
 
           if (therapistsRes.statusCode == 200 && therapistsRes.data != null && therapistsRes.data['therapists'] != null) {
@@ -777,7 +811,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           GridView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
-                            itemCount: 6,
+                            itemCount: _quickServices.length > 6 ? 6 : _quickServices.length,
                             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
                               crossAxisSpacing: 10,
@@ -786,7 +820,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             ),
                             itemBuilder: (context, index) {
                               final service = _quickServices[index];
-                              final title = service['title'] as String;
+                              final title = (service['title'] ?? '').toString();
 
                               return GestureDetector(
                                 onTap: () => _showServiceBottomSheet(service),
