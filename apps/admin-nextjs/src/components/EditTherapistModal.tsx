@@ -14,6 +14,7 @@ interface EditTherapistModalProps {
     specialization: string[];
     workingHours?: { start: string; end: string };
     ratingAverage?: number;
+    profilePhoto?: string;
   };
   onUpdate: (formData: FormData) => Promise<void>;
   onDelete: (formData: FormData) => Promise<void>;
@@ -218,6 +219,31 @@ export default function EditTherapistModal({
                     defaultValue={(therapist.specialization || []).join(', ')}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-700 focus:outline-none focus:border-teal-500"
                   />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                    Doctor Headshot / Photo (Auto-WebP)
+                  </label>
+                  {therapist.profilePhoto && (
+                    <div className="flex items-center gap-3 mb-2 p-2 bg-slate-50 rounded-xl border border-slate-200/60">
+                      <img
+                        src={therapist.profilePhoto}
+                        alt={therapist.name}
+                        className="w-10 h-10 rounded-full object-cover object-top border border-teal-200"
+                      />
+                      <span className="text-[11px] text-slate-500 font-medium">Current profile photo active</span>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    name="profileImage"
+                    accept="image/png, image/jpeg, image/jpg, image/webp"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer focus:outline-none focus:border-teal-500"
+                  />
+                  <p className="text-[10px] text-teal-700 font-semibold mt-1">
+                    ⚡ Auto-converted to compressed .webp for fast loading across web and mobile app.
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">

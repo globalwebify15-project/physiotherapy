@@ -8,9 +8,11 @@ import {
   GraduationCap, 
   Plus, 
   CalendarDays, 
-  Star 
+  Star,
+  Camera
 } from 'lucide-react';
 import EditTherapistModal from '@/components/EditTherapistModal';
+import { processAndSaveDoctorImage } from '@/utils/imageOptimizer';
 
 export const revalidate = 0; // Dynamic fetch
 
@@ -23,7 +25,17 @@ async function onboardTherapistAction(formData: FormData) {
   const qualification = formData.get('qualification') as string;
   const experience = parseInt(formData.get('experience') as string) || 0;
   const specializationStr = formData.get('specialization') as string;
+  const imageFile = formData.get('profileImage') as File | null;
   
+  let profilePhoto = '';
+  if (imageFile && imageFile.size > 0) {
+    try {
+      profilePhoto = await processAndSaveDoctorImage(imageFile, name);
+    } catch (err) {
+      console.error('Error optimizing doctor image:', err);
+    }
+  }
+
   const specialization = specializationStr
     ? specializationStr.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
@@ -33,6 +45,7 @@ async function onboardTherapistAction(formData: FormData) {
     name,
     email,
     mobile,
+    profilePhoto,
     qualification,
     experience,
     specialization,
@@ -56,6 +69,7 @@ async function updateTherapistAction(formData: FormData) {
   const specializationStr = formData.get('specialization') as string;
   const startTime = (formData.get('startTime') as string) || '09:00';
   const endTime = (formData.get('endTime') as string) || '19:00';
+  const imageFile = formData.get('profileImage') as File | null;
 
   if (!therapistId) return;
 
@@ -63,8 +77,7 @@ async function updateTherapistAction(formData: FormData) {
     ? specializationStr.split(',').map((s) => s.trim()).filter(Boolean)
     : [];
 
-  await connectDB();
-  await Therapist.findByIdAndUpdate(therapistId, {
+  const updateData: any = {
     name,
     email,
     mobile,
@@ -72,7 +85,21 @@ async function updateTherapistAction(formData: FormData) {
     experience,
     specialization,
     workingHours: { start: startTime, end: endTime },
-  });
+  };
+
+  if (imageFile && imageFile.size > 0) {
+    try {
+      const profilePhoto = await processAndSaveDoctorImage(imageFile, name);
+      if (profilePhoto) {
+        updateData.profilePhoto = profilePhoto;
+      }
+    } catch (err) {
+      console.error('Error optimizing doctor image on update:', err);
+    }
+  }
+
+  await connectDB();
+  await Therapist.findByIdAndUpdate(therapistId, updateData);
 
   revalidatePath('/admin/therapists');
 }
@@ -191,6 +218,23 @@ export default async function TherapistsPage() {
               />
             </div>
 
+            <div>
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Doctor Headshot / Photo (Auto-WebP Optimised)
+              </label>
+              <div className="relative">
+                <input 
+                  type="file" 
+                  name="profileImage" 
+                  accept="image/png, image/jpeg, image/jpg, image/webp"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer focus:outline-none focus:border-teal-500"
+                />
+              </div>
+              <p className="text-[10px] text-teal-700 font-semibold mt-1">
+                ⚡ Automatically cropped, compressed & converted to high-speed <strong>.webp</strong> in the public folder.
+              </p>
+            </div>
+
             <button 
               type="submit" 
               className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-teal-100"
@@ -218,9 +262,17 @@ export default async function TherapistsPage() {
                   {/* Avatar and rating header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-base border border-teal-100">
-                        {therapist.name.charAt(0)}
-                      </div>
+                      {therapist.profilePhoto ? (
+                        <img
+                          src={therapist.profilePhoto}
+                          alt={therapist.name}
+                          className="w-12 h-12 rounded-full object-cover object-top border-2 border-teal-500/20 shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-base border border-teal-100">
+                          {therapist.name.charAt(0)}
+                        </div>
+                      )}
                       <div>
                         <h4 className="font-bold text-slate-800 text-base leading-snug">{therapist.name}</h4>
                         <span className="text-xs font-semibold text-slate-400">Experience: {therapist.experience} years</span>
@@ -284,6 +336,7 @@ export default async function TherapistsPage() {
                       end: String(therapist.workingHours?.end || '19:00'),
                     },
                     ratingAverage: Number(therapist.ratingAverage || 5),
+                    profilePhoto: therapist.profilePhoto ? String(therapist.profilePhoto) : undefined,
                   }}
                   onUpdate={updateTherapistAction}
                   onDelete={deleteTherapistAction}
