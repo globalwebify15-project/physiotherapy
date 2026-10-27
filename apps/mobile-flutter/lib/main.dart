@@ -20,7 +20,11 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().initialize();
+  try {
+    await NotificationService().initialize();
+  } catch (e) {
+    debugPrint('[NOTIFICATION INIT] Initialized with fallback: $e');
+  }
 
   runApp(
     const ProviderScope(
