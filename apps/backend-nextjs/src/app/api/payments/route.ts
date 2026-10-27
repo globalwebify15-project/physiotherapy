@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
       amount: order.amount,
       currency: order.currency,
       paymentId: payment._id,
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TssirY8P33aIzy',
     });
   } catch (error: any) {
     console.error('Error creating payment order:', error);

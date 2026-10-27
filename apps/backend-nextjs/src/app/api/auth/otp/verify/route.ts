@@ -54,12 +54,12 @@ export async function POST(request: NextRequest) {
       // Create a skeleton patient profile
       patient = await Patient.create({
         userId: user._id,
-        name: `Patient (${mobile.slice(-4)})`,
+        name: `Patient (${targetMobile.slice(-4)})`,
         gender: 'other',
         dob: new Date('2000-01-01'),
         emergencyContact: {
           name: 'Emergency Contact',
-          phone: mobile,
+          phone: targetMobile,
           relation: 'Self',
         },
         savedAddresses: [],

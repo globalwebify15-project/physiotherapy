@@ -267,6 +267,10 @@ class _BookingScreenState extends State<BookingScreen> {
       orElse: () => {'title': 'Physiotherapy Consultation'},
     );
 
+    final userMobile = await _storage.read(key: 'userMobile') ?? '';
+    final userName = await _storage.read(key: 'patientName') ?? 'Patient';
+    final userEmail = await _storage.read(key: 'patientEmail') ?? 'patient@quickphysio24.com';
+
     try {
       // 1. Create Appointment
       final apptRes = await _apiService.post('/appointments', data: {
@@ -277,6 +281,8 @@ class _BookingScreenState extends State<BookingScreen> {
         'visitType': _selectedVisitType,
         'paymentMethod': _selectedPaymentMethod,
         'address': _selectedVisitType == 'home' ? _addressController.text.trim() : null,
+        'mobile': userMobile,
+        'patientName': userName,
       });
 
       final apptData = apptRes.data;
@@ -302,11 +308,7 @@ class _BookingScreenState extends State<BookingScreen> {
                 (payData['payment'] is Map ? payData['payment']['_id']?.toString() : null);
             final orderId = payData['orderId']?.toString();
             final amount = payData['amount'] ?? 80000;
-            final keyId = payData['keyId']?.toString() ?? 'rzp_test_placeholder';
-
-            final userMobile = await _storage.read(key: 'userMobile') ?? '9876543210';
-            final userName = await _storage.read(key: 'patientName') ?? 'Patient';
-            final userEmail = await _storage.read(key: 'patientEmail') ?? 'patient@quickphysio24.com';
+            final keyId = payData['keyId']?.toString() ?? 'rzp_test_TssirY8P33aIzy';
 
             var options = {
               'key': keyId,

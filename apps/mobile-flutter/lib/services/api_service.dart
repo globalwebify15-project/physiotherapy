@@ -293,17 +293,20 @@ class ApiService {
     if (mobile.isEmpty) {
       mobile = await _storage.read(key: 'userMobile') ?? '';
     }
-    final key = 'user_appointments_$mobile';
-    final raw = await _storage.read(key: key);
+    final clean = mobile.replaceFirst(RegExp(r'^\+91'), '').trim();
+    final raw = await _storage.read(key: 'user_appointments_$clean');
     if (raw != null && raw.isNotEmpty) {
       try {
         final List<dynamic> decoded = jsonDecode(raw);
         return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
       } catch (_) {}
     }
-    // Default seed only for initial default demo account (9334306358)
-    if (mobile == '9334306358') {
-      return [_defaultSeedAppt];
+    final rawDirect = await _storage.read(key: 'user_appointments_$mobile');
+    if (rawDirect != null && rawDirect.isNotEmpty) {
+      try {
+        final List<dynamic> decoded = jsonDecode(rawDirect);
+        return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      } catch (_) {}
     }
     return [];
   }
@@ -312,20 +315,38 @@ class ApiService {
     if (mobile.isEmpty) {
       mobile = await _storage.read(key: 'userMobile') ?? '';
     }
-    final key = 'user_appointments_$mobile';
-    await _storage.write(key: key, value: jsonEncode(list));
+    final clean = mobile.replaceFirst(RegExp(r'^\+91'), '').trim();
+    final encoded = jsonEncode(list);
+    await _storage.write(key: 'user_appointments_$clean', value: encoded);
+    if (clean != mobile) {
+      await _storage.write(key: 'user_appointments_$mobile', value: encoded);
+    }
   }
 
   Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+    final currentMobile = await _storage.read(key: 'userMobile') ?? '';
+    final cleanMobile = currentMobile.replaceFirst(RegExp(r'^\+91'), '').trim();
+
     if (!_useMockMode) {
       try {
-        final res = await _dio.get(path, queryParameters: queryParameters);
+        final params = Map<String, dynamic>.from(queryParameters ?? {});
+        if (path.startsWith('/appointments') && cleanMobile.isNotEmpty && !params.containsKey('mobile')) {
+          params['mobile'] = cleanMobile;
+        }
+        final res = await _dio.get(path, queryParameters: params);
+        if (res.statusCode == 200 && path.startsWith('/appointments') && res.data is Map && res.data['appointments'] != null) {
+          final liveList = List<Map<String, dynamic>>.from(
+            (res.data['appointments'] as List).map((e) => Map<String, dynamic>.from(e as Map))
+          );
+          if (liveList.isNotEmpty) {
+            await _saveUserAppointments(cleanMobile, liveList);
+          }
+        }
         return res;
       } catch (e) {
         print('[ApiService Live GET Failed, Falling back to local offline cache]: $e');
       }
     }
-    final currentMobile = await _storage.read(key: 'userMobile') ?? '';
       
       if (path.contains('/appointments/slots')) {
         return Response(
@@ -340,7 +361,7 @@ class ApiService {
           },
         );
       } else if (path.startsWith('/appointments')) {
-        final appts = await _loadUserAppointments(currentMobile);
+        final appts = await _loadUserAppointments(cleanMobile);
         return Response(
           requestOptions: RequestOptions(path: path),
           statusCode: 200,
@@ -471,9 +492,21 @@ class ApiService {
   }
 
   Future<Response> post(String path, {dynamic data}) async {
+    final currentMobile = await _storage.read(key: 'userMobile') ?? '';
+    final cleanMobile = currentMobile.replaceFirst(RegExp(r'^\+91'), '').trim();
+
     if (!_useMockMode) {
       try {
         final res = await _dio.post(path, data: data);
+        if ((res.statusCode == 200 || res.statusCode == 201) && path.startsWith('/appointments') && res.data is Map) {
+          final appt = res.data['appointment'] ?? res.data;
+          if (appt is Map) {
+            final existing = await _loadUserAppointments(cleanMobile);
+            existing.removeWhere((a) => a['_id'] == appt['_id']);
+            existing.insert(0, Map<String, dynamic>.from(appt));
+            await _saveUserAppointments(cleanMobile, existing);
+          }
+        }
         return res;
       } catch (e) {
         print('[ApiService Live POST Failed, Falling back to local offline cache]: $e');
