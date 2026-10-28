@@ -1,10 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
+import mongoose from 'mongoose';
 import { connectDB, Appointment, Therapist } from 'database';
 
-const DEFAULT_SLOTS = [
-  '09:00', '10:00', '11:00', '12:00', '13:00', 
-  '14:00', '15:00', '16:00', '17:00', '18:00'
+interface SlotDefinition {
+  label12: string; // "09:00 AM"
+  value24: string; // "09:00"
+  hour: number;    // 9
+}
+
+const DEFAULT_SLOTS: SlotDefinition[] = [
+  { label12: '09:00 AM', value24: '09:00', hour: 9 },
+  { label12: '10:00 AM', value24: '10:00', hour: 10 },
+  { label12: '11:00 AM', value24: '11:00', hour: 11 },
+  { label12: '12:00 PM', value24: '12:00', hour: 12 },
+  { label12: '01:00 PM', value24: '13:00', hour: 13 },
+  { label12: '02:00 PM', value24: '14:00', hour: 14 },
+  { label12: '03:00 PM', value24: '15:00', hour: 15 },
+  { label12: '04:00 PM', value24: '16:00', hour: 16 },
+  { label12: '05:00 PM', value24: '17:00', hour: 17 },
+  { label12: '06:00 PM', value24: '18:00', hour: 18 },
 ];
+
+function normalizeSlotHour(slot: string): number | null {
+  if (!slot) return null;
+  const s = slot.trim().toUpperCase();
+  const m = s.match(/(\d+):(\d+)\s*(AM|PM)?/);
+  if (!m) return null;
+  let hour = parseInt(m[1], 10);
+  const ampm = m[3];
+  if (ampm === 'PM' && hour < 12) hour += 12;
+  if (ampm === 'AM' && hour === 12) hour = 0;
+  return hour;
+}
 
 // GET /api/appointments/slots?date=2026-08-08&therapistId=XYZ
 export async function GET(request: NextRequest) {
@@ -12,92 +39,142 @@ export async function GET(request: NextRequest) {
     await connectDB();
     const url = new URL(request.url);
     const date = url.searchParams.get('date');
-    const therapistId = url.searchParams.get('therapistId');
+    const rawTherapistId = url.searchParams.get('therapistId');
 
     if (!date) {
       return NextResponse.json({ error: 'Date is required (YYYY-MM-DD)' }, { status: 400 });
     }
 
-    const bookingDate = new Date(date);
-    const dayOfWeek = bookingDate.getDay(); // 0 (Sun) - 6 (Sat)
+    const bookingDate = new Date(date + 'T00:00:00Z');
+    const dayOfWeek = bookingDate.getUTCDay(); // 0 (Sun) - 6 (Sat)
 
-    if (therapistId) {
-      // 1. Specific therapist slot check
-      const therapist = await Therapist.findById(therapistId);
+    if (rawTherapistId && rawTherapistId !== 'all') {
+      // 1. Specific therapist slot check (handles ObjectId or name alias)
+      let therapist = null;
+      if (mongoose.Types.ObjectId.isValid(rawTherapistId)) {
+        therapist = await Therapist.findById(rawTherapistId);
+      } else {
+        const isPriyanka = rawTherapistId.toLowerCase().includes('priyanka');
+        therapist = await Therapist.findOne({
+          name: new RegExp(isPriyanka ? 'Priyanka' : 'Rajnish', 'i'),
+          isActive: true,
+        });
+      }
+
       if (!therapist || !therapist.isActive) {
         return NextResponse.json({ error: 'Therapist not found or inactive' }, { status: 404 });
       }
 
-      // Check if they work on this day of the week
-      if (!therapist.workingDays.includes(dayOfWeek)) {
-        return NextResponse.json({ success: true, slots: [] });
+      // Check if therapist works on this day
+      const workingDays = therapist.workingDays || [0, 1, 2, 3, 4, 5, 6];
+      if (!workingDays.includes(dayOfWeek)) {
+        return NextResponse.json({ 
+          success: true, 
+          slots: [], 
+          availableLabels: [],
+          bookedLabels: [],
+          workingHours: therapist.workingHours 
+        });
       }
 
-      // Find already booked slots
+      // Find all non-cancelled bookings for this therapist on this date
       const bookings = await Appointment.find({
-        therapistId,
+        therapistId: therapist._id,
         date,
-        status: { $ne: 'cancelled' }
+        status: { $ne: 'cancelled' },
       });
 
-      const bookedSlots = bookings.map(b => b.timeSlot);
-      
-      // Filter slots based on working hours and current bookings
-      const startHour = parseInt(therapist.workingHours.start.split(':')[0]);
-      const endHour = parseInt(therapist.workingHours.end.split(':')[0]);
+      const bookedHours = new Set(
+        bookings.map((b) => normalizeSlotHour(b.timeSlot)).filter((h): h is number => h !== null)
+      );
 
-      const availableSlots = DEFAULT_SLOTS.filter(slot => {
-        const slotHour = parseInt(slot.split(':')[0]);
-        // Slot must fall within working hours and not be booked
-        return slotHour >= startHour && slotHour < endHour && !bookedSlots.includes(slot);
+      const startHour = parseInt((therapist.workingHours?.start || '09:00').split(':')[0], 10);
+      const endHour = parseInt((therapist.workingHours?.end || '19:00').split(':')[0], 10);
+
+      const availableSlots: string[] = [];
+      const availableLabels: string[] = [];
+      const bookedLabels: string[] = [];
+
+      for (const slot of DEFAULT_SLOTS) {
+        const isWithinHours = slot.hour >= startHour && slot.hour < endHour;
+        const isBooked = bookedHours.has(slot.hour);
+
+        if (isWithinHours && !isBooked) {
+          availableSlots.push(slot.value24);
+          availableLabels.push(slot.label12);
+        } else if (isBooked) {
+          bookedLabels.push(slot.label12);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        slots: availableLabels, // Default to 12-hour labels ("10:00 AM")
+        available24: availableSlots,
+        availableLabels,
+        bookedLabels,
+        therapist: {
+          id: therapist._id.toString(),
+          name: therapist.name,
+        },
       });
-
-      return NextResponse.json({ success: true, slots: availableSlots });
     } else {
-      // 2. Generic slot check (at least one therapist must be free)
+      // 2. Generic slot check across all active practitioners
       const therapists = await Therapist.find({ isActive: true });
-      
-      // Filter therapists that work on this day
-      const workingTherapists = therapists.filter(t => t.workingDays.includes(dayOfWeek));
+      const workingTherapists = therapists.filter((t) => {
+        const days = t.workingDays || [0, 1, 2, 3, 4, 5, 6];
+        return days.includes(dayOfWeek);
+      });
 
       if (workingTherapists.length === 0) {
-        return NextResponse.json({ success: true, slots: [] });
+        return NextResponse.json({ success: true, slots: [], availableLabels: [], bookedLabels: [] });
       }
 
-      // Find all bookings on this day
       const bookings = await Appointment.find({
         date,
         status: { $ne: 'cancelled' },
-        therapistId: { $exists: true }
+        therapistId: { $exists: true },
       });
 
-      // Map out bookings by slot: { slot: [therapistId1, therapistId2] }
-      const slotBookings: { [slot: string]: string[] } = {};
-      bookings.forEach(b => {
-        if (b.therapistId) {
-          const tIdStr = b.therapistId.toString();
-          if (!slotBookings[b.timeSlot]) {
-            slotBookings[b.timeSlot] = [];
-          }
-          slotBookings[b.timeSlot].push(tIdStr);
-        }
-      });
+      // Map { hour: Set<therapistId> }
+      const hourBookings = new Map<number, Set<string>>();
+      for (const b of bookings) {
+        if (!b.therapistId) continue;
+        const h = normalizeSlotHour(b.timeSlot);
+        if (h === null) continue;
+        if (!hourBookings.has(h)) hourBookings.set(h, new Set());
+        hourBookings.get(h)!.add(b.therapistId.toString());
+      }
 
-      // A slot is available if there is at least one therapist who works on this day AND is not booked for this slot
-      const availableSlots = DEFAULT_SLOTS.filter(slot => {
-        return workingTherapists.some(t => {
-          const startHour = parseInt(t.workingHours.start.split(':')[0]);
-          const endHour = parseInt(t.workingHours.end.split(':')[0]);
-          const slotHour = parseInt(slot.split(':')[0]);
+      const availableLabels: string[] = [];
+      const availableSlots: string[] = [];
+      const bookedLabels: string[] = [];
 
-          const isWorking = slotHour >= startHour && slotHour < endHour;
-          const isBooked = slotBookings[slot] && slotBookings[slot].includes(t._id.toString());
-
-          return isWorking && !isBooked;
+      for (const slot of DEFAULT_SLOTS) {
+        const hasFreeDoctor = workingTherapists.some((t) => {
+          const startHour = parseInt((t.workingHours?.start || '09:00').split(':')[0], 10);
+          const endHour = parseInt((t.workingHours?.end || '19:00').split(':')[0], 10);
+          const isWorking = slot.hour >= startHour && slot.hour < endHour;
+          const bookedDocs = hourBookings.get(slot.hour);
+          const isBookedForThisDoc = bookedDocs && bookedDocs.has(t._id.toString());
+          return isWorking && !isBookedForThisDoc;
         });
-      });
 
-      return NextResponse.json({ success: true, slots: availableSlots });
+        if (hasFreeDoctor) {
+          availableLabels.push(slot.label12);
+          availableSlots.push(slot.value24);
+        } else {
+          bookedLabels.push(slot.label12);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        slots: availableLabels,
+        available24: availableSlots,
+        availableLabels,
+        bookedLabels,
+      });
     }
   } catch (error: any) {
     console.error('Error fetching available slots:', error);

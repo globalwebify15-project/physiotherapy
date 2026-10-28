@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../utils/phone_helper.dart';
 
 class ApiService {
   final Dio _dio = Dio();
@@ -800,6 +801,33 @@ class ApiService {
       print('[fetchCmsFaqs Network Warning, falling back to core FAQs]: $e');
     }
     return defaultFaqs;
+  }
+
+  /// Fetches live clinic contact and helpline details from MongoDB CMS,
+  /// automatically syncing PhoneHelper so call/WhatsApp buttons are dynamic.
+  Future<Map<String, dynamic>?> fetchCmsContactDetails() async {
+    try {
+      final res = await get('/cms', queryParameters: {'key': 'contact_details'});
+      if (res.statusCode == 200 && res.data != null) {
+        dynamic content = res.data['content'];
+        if (content == null && res.data['cmsBlocks'] is List) {
+          final block = (res.data['cmsBlocks'] as List).firstWhere(
+            (b) => b['key'] == 'contact_details',
+            orElse: () => null,
+          );
+          if (block != null) content = block['content'];
+        }
+
+        if (content is Map) {
+          final map = Map<String, dynamic>.from(content);
+          PhoneHelper.updateFromCms(map);
+          return map;
+        }
+      }
+    } catch (e) {
+      print('[fetchCmsContactDetails Warning]: $e');
+    }
+    return null;
   }
 }
 

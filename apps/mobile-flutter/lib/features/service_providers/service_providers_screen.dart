@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_bottom_nav.dart';
 
@@ -12,6 +13,8 @@ class ServiceProvidersScreen extends StatefulWidget {
 
 class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
   final _searchController = TextEditingController();
+  final ApiService _apiService = ApiService();
+  bool _isLoadingDoctors = false;
   
   String _selectedServiceFilter = 'All';
   String _searchQuery = '';
@@ -91,6 +94,95 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
   ];
 
   @override
+  void initState() {
+    super.initState();
+    _loadLiveDoctors();
+  }
+
+  Future<void> _loadLiveDoctors() async {
+    setState(() => _isLoadingDoctors = true);
+    try {
+      final res = await _apiService.get('/therapists');
+      if (res.statusCode == 200 && res.data != null && res.data['therapists'] != null) {
+        final List<dynamic> list = res.data['therapists'];
+        if (list.isNotEmpty && mounted) {
+          final List<Map<String, dynamic>> liveDocs = [];
+          for (final item in list) {
+            if (item is Map) {
+              final id = item['_id']?.toString() ?? item['id']?.toString() ?? '';
+              final name = item['name']?.toString() ?? '';
+              if (name.isEmpty) continue;
+
+              final qual = item['qualification']?.toString() ?? 'Physiotherapy Specialist';
+              final exp = item['experience'] is num ? (item['experience'] as num).toInt() : 5;
+              final rating = item['ratingAverage'] is num ? (item['ratingAverage'] as num).toDouble() : 5.0;
+              final reviews = item['ratingCount'] is num ? (item['ratingCount'] as num).toInt() : 45;
+              final phone = item['mobile']?.toString() ?? '+91 91109 12544';
+              final photo = item['profilePhoto']?.toString() ?? '';
+              final workingHours = item['workingHours'] is Map
+                  ? "${item['workingHours']['start'] ?? '09:00 AM'} – ${item['workingHours']['end'] ?? '07:00 PM'}"
+                  : '9:00 AM – 7:00 PM';
+
+              final rawSpecs = item['specialization'];
+              final List<String> specs = (rawSpecs is List)
+                  ? rawSpecs.map((s) => s.toString()).toList()
+                  : ['General Physiotherapy', 'Pain Management'];
+
+              final isRajnish = name.toLowerCase().contains('rajnish');
+              final isPriyanka = name.toLowerCase().contains('priyanka');
+
+              String defaultImg = isRajnish
+                  ? 'assets/images/dr_rajnish_head.png'
+                  : (isPriyanka ? 'assets/images/dr_priyanka_head.png' : '');
+
+              liveDocs.add({
+                'id': id,
+                '_id': id,
+                'name': name,
+                'qualification': qual,
+                'designation': isRajnish
+                    ? "Founder & Chief Physiotherapist of Dr. Bariyar's Physiotherapy & Rehabilitation\nJoint Secretary, IAP (Jharkhand Branch)"
+                    : (isPriyanka
+                        ? "Co- Founder & Director of Dr. Bariyar's Physiotherapy & Neuro Rehabilitation"
+                        : "Consultant Physiotherapist at QuickPhysio24.com"),
+                'shortRole': isRajnish
+                    ? 'Founder & Chief Physiotherapist'
+                    : (isPriyanka ? 'Co-Founder & Director' : 'Consultant Physiotherapist'),
+                'experience': '$exp+ Years Experience',
+                'hours': workingHours,
+                'image': photo.isNotEmpty ? photo : defaultImg,
+                'profilePhoto': photo,
+                'rating': rating,
+                'reviews': reviews,
+                'phone': phone,
+                'consultationFee': '₹800 (Clinic) / ₹1200 (Home)',
+                'specialties': specs,
+                'bio': '$name is a qualified physiotherapist specializing in ${(specs.take(4).join(', '))} with over $exp years of clinical experience.',
+                'isLive': true,
+              });
+            }
+          }
+
+          if (liveDocs.isNotEmpty) {
+            final liveNames = liveDocs.map((d) => d['name'].toString().toLowerCase().trim()).toSet();
+            final remainingDefaults = _doctors.where((d) => !liveNames.contains(d['name'].toString().toLowerCase().trim())).toList();
+
+            setState(() {
+              _doctors
+                ..clear()
+                ..addAll([...liveDocs, ...remainingDefaults]);
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading live therapists: $e');
+    } finally {
+      if (mounted) setState(() => _isLoadingDoctors = false);
+    }
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
@@ -119,7 +211,41 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
   Widget _buildDoctorAvatar(Map<String, dynamic> doctor, {double width = 80, double height = 95, double radius = 18}) {
     final isRajnish = (doctor['id'] ?? '') == 'dr_rajnish' || (doctor['name'] ?? '').toString().toLowerCase().contains('rajnish');
     final assetPath = isRajnish ? 'assets/images/dr_rajnish_head.png' : 'assets/images/dr_priyanka_head.png';
-    final customImage = doctor['image'] as String?;
+    final customImage = (doctor['image'] ?? doctor['profilePhoto']) as String?;
+
+    Widget imageWidget;
+    if (customImage != null && customImage.isNotEmpty) {
+      if (customImage.startsWith('http')) {
+        imageWidget = Image.network(
+          customImage,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          errorBuilder: (_, __, ___) => Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E))),
+        );
+      } else if (customImage.startsWith('/doctors') || customImage.startsWith('/uploads')) {
+        final fullUrl = 'https://physiotherapy-backend-nextjs.vercel.app$customImage';
+        imageWidget = Image.network(
+          fullUrl,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          errorBuilder: (_, __, ___) => Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E))),
+        );
+      } else {
+        imageWidget = Image.asset(
+          customImage,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          errorBuilder: (_, __, ___) => Image.asset(assetPath, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E))),
+        );
+      }
+    } else {
+      imageWidget = Image.asset(
+        assetPath,
+        fit: BoxFit.cover,
+        alignment: Alignment.topCenter,
+        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E)),
+      );
+    }
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(radius),
@@ -127,19 +253,7 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
         width: width,
         height: height,
         color: const Color(0xFFE0F2FE),
-        child: Image.asset(
-          (customImage != null && customImage.isNotEmpty) ? customImage : assetPath,
-          fit: BoxFit.cover,
-          alignment: Alignment.topCenter,
-          errorBuilder: (context, error, stackTrace) {
-            return Image.asset(
-              assetPath,
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-              errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, size: 40, color: Color(0xFF0F766E)),
-            );
-          },
-        ),
+        child: imageWidget,
       ),
     );
   }
@@ -506,31 +620,41 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
 
           // Doctor List
           Expanded(
-            child: _filteredDoctors.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+            child: RefreshIndicator(
+              onRefresh: _loadLiveDoctors,
+              color: const Color(0xFF0F766E),
+              child: _filteredDoctors.isEmpty
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(),
                       children: [
-                        const Icon(Icons.person_search_rounded, size: 56, color: Color(0xFF94A3B8)),
-                        const SizedBox(height: 12),
-                        const Text('No specialists found matching your search', style: TextStyle(color: Color(0xFF64748B))),
-                        TextButton(
-                          onPressed: () {
-                            setState(() {
-                              _searchQuery = '';
-                              _selectedServiceFilter = 'All';
-                              _searchController.clear();
-                            });
-                          },
-                          child: const Text('Reset Filters'),
-                        )
+                        SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.person_search_rounded, size: 56, color: Color(0xFF94A3B8)),
+                              const SizedBox(height: 12),
+                              const Text('No specialists found matching your search', style: TextStyle(color: Color(0xFF64748B))),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _selectedServiceFilter = 'All';
+                                    _searchController.clear();
+                                  });
+                                },
+                                child: const Text('Reset Filters'),
+                              )
+                            ],
+                          ),
+                        ),
                       ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _filteredDoctors.length,
-                    itemBuilder: (context, index) {
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _filteredDoctors.length,
+                      itemBuilder: (context, index) {
                       final doc = _filteredDoctors[index];
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -691,6 +815,7 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
                       );
                     },
                   ),
+            ),
           ),
         ],
       ),

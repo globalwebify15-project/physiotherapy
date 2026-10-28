@@ -9,6 +9,23 @@ class PhoneHelper {
   static String drRajnishPhone = '+919110912544';
   static String drPriyankaPhone = '+919693233447';
 
+  /// Updates contact and helpline details dynamically from Admin CMS
+  static void updateFromCms(Map<String, dynamic> cms) {
+    if (cms['phone'] != null && cms['phone'].toString().trim().isNotEmpty) {
+      helplinePhone = cms['phone'].toString().trim();
+    }
+    if (cms['whatsapp'] != null && cms['whatsapp'].toString().trim().isNotEmpty) {
+      whatsappNumber = cms['whatsapp'].toString().trim();
+      secondaryPhone = cms['whatsapp'].toString().trim();
+    }
+    if (cms['drRajnishPhone'] != null && cms['drRajnishPhone'].toString().trim().isNotEmpty) {
+      drRajnishPhone = cms['drRajnishPhone'].toString().trim();
+    }
+    if (cms['drPriyankaPhone'] != null && cms['drPriyankaPhone'].toString().trim().isNotEmpty) {
+      drPriyankaPhone = cms['drPriyankaPhone'].toString().trim();
+    }
+  }
+
   /// Initiates a direct phone call to the target number
   static Future<void> makePhoneCall(String phoneNumber, {BuildContext? context}) async {
     final cleaned = phoneNumber.replaceAll(RegExp(r'[^0-9+]'), '');

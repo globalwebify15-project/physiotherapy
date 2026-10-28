@@ -57,6 +57,7 @@ class _BookingScreenState extends State<BookingScreen> {
     '05:00 PM',
     '06:00 PM'
   ];
+  Set<String> _bookedSlots = {};
 
   String? _selectedServiceId = '1';
   String? _selectedTherapistId = 'dr_rajnish';
@@ -175,6 +176,29 @@ class _BookingScreenState extends State<BookingScreen> {
         _services = servicesRes.data['services'] ?? [];
         if (therapistsRes.data['therapists'] != null && (therapistsRes.data['therapists'] as List).isNotEmpty) {
           _therapists = therapistsRes.data['therapists'];
+          
+          // Match selected therapist
+          if (_selectedTherapistId != null) {
+            final exists = _therapists.any((t) => t['_id']?.toString() == _selectedTherapistId);
+            if (!exists) {
+              if (_selectedTherapistId == 'dr_rajnish') {
+                final match = _therapists.firstWhere(
+                  (t) => (t['name'] ?? '').toString().toLowerCase().contains('rajnish'),
+                  orElse: () => null,
+                );
+                if (match != null) _selectedTherapistId = match['_id']?.toString();
+              } else if (_selectedTherapistId == 'dr_priyanka') {
+                final match = _therapists.firstWhere(
+                  (t) => (t['name'] ?? '').toString().toLowerCase().contains('priyanka'),
+                  orElse: () => null,
+                );
+                if (match != null) _selectedTherapistId = match['_id']?.toString();
+              }
+            }
+          }
+          if (_selectedTherapistId == null && _therapists.isNotEmpty) {
+            _selectedTherapistId = _therapists[0]['_id']?.toString();
+          }
         }
         if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
           final matched = _services.firstWhere(
@@ -190,6 +214,7 @@ class _BookingScreenState extends State<BookingScreen> {
         }
         _isLoading = false;
       });
+      _fetchAvailableSlots();
     } catch (e) {
       // Fallback default services if network is offline
       setState(() {
@@ -224,7 +249,107 @@ class _BookingScreenState extends State<BookingScreen> {
         }
         _isLoading = false;
       });
+      _fetchAvailableSlots();
     }
+  }
+
+  Future<void> _fetchAvailableSlots() async {
+    if (!mounted) return;
+    setState(() => _isSlotsLoading = true);
+    try {
+      final formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final res = await _apiService.get(
+        '/appointments/slots',
+        queryParameters: {
+          'date': formattedDate,
+          if (_selectedTherapistId != null && _selectedTherapistId!.isNotEmpty)
+            'therapistId': _selectedTherapistId,
+        },
+      );
+      if (res.statusCode == 200 && res.data != null) {
+        final List<dynamic> slotsData = res.data['slots'] is List ? res.data['slots'] : [];
+        final List<dynamic> bookedData = res.data['bookedLabels'] is List ? res.data['bookedLabels'] : [];
+
+        final bookedSet = bookedData.map((e) => e.toString().toUpperCase().trim()).toSet();
+
+        if (slotsData.isNotEmpty) {
+          final List<String> allSlotLabels = [];
+          for (final item in slotsData) {
+            if (item is Map && item['label'] != null) {
+              final label = item['label'].toString();
+              allSlotLabels.add(label);
+              if (item['available'] == false) {
+                bookedSet.add(label.toUpperCase().trim());
+              }
+            }
+          }
+          if (allSlotLabels.isNotEmpty) {
+            _slots = allSlotLabels;
+          }
+        }
+
+        _bookedSlots = bookedSet;
+
+        // Auto-select first available slot if currently selected is booked
+        if (_selectedSlot != null && _bookedSlots.contains(_selectedSlot!.toUpperCase().trim())) {
+          final firstAvailable = _slots.firstWhere(
+            (s) => !_bookedSlots.contains(s.toUpperCase().trim()),
+            orElse: () => '',
+          );
+          _selectedSlot = firstAvailable.isNotEmpty ? firstAvailable : null;
+        } else if (_selectedSlot == null) {
+          final firstAvailable = _slots.firstWhere(
+            (s) => !_bookedSlots.contains(s.toUpperCase().trim()),
+            orElse: () => '',
+          );
+          if (firstAvailable.isNotEmpty) _selectedSlot = firstAvailable;
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching slots: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSlotsLoading = false);
+      }
+    }
+  }
+
+  Widget _buildTherapistImage(Map<String, dynamic> doctor) {
+    final photo = (doctor['profilePhoto'] ?? doctor['image']) as String?;
+    final isRajnish = (doctor['_id'] == 'dr_rajnish' || (doctor['name'] ?? '').toString().toLowerCase().contains('rajnish'));
+    final assetFallback = isRajnish ? 'assets/images/dr_rajnish_head.png' : 'assets/images/dr_priyanka_head.png';
+
+    if (photo != null && photo.isNotEmpty) {
+      if (photo.startsWith('http')) {
+        return Image.network(
+          photo,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          errorBuilder: (_, __, ___) => Image.asset(assetFallback, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF0F766E))),
+        );
+      } else if (photo.startsWith('/doctors') || photo.startsWith('/uploads')) {
+        final fullUrl = 'https://physiotherapy-backend-nextjs.vercel.app$photo';
+        return Image.network(
+          fullUrl,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          errorBuilder: (_, __, ___) => Image.asset(assetFallback, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF0F766E))),
+        );
+      } else if (photo.startsWith('assets/')) {
+        return Image.asset(
+          photo,
+          fit: BoxFit.cover,
+          alignment: Alignment.topCenter,
+          errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF0F766E)),
+        );
+      }
+    }
+    return Image.asset(
+      assetFallback,
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF0F766E)),
+    );
   }
 
   Future<void> _createBooking() async {
@@ -238,6 +363,16 @@ class _BookingScreenState extends State<BookingScreen> {
     if (_selectedSlot == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please select an appointment time slot')),
+      );
+      return;
+    }
+
+    if (_bookedSlots.contains(_selectedSlot!.toUpperCase().trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('The selected time slot is already booked. Please choose an available time slot.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
       );
       return;
     }
@@ -431,77 +566,83 @@ class _BookingScreenState extends State<BookingScreen> {
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                         ),
                         const SizedBox(height: 10),
-                        Row(
-                          children: _therapists.map<Widget>((doctor) {
-                            final isSelected = _selectedTherapistId == doctor['_id'];
-                            return Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => _selectedTherapistId = doctor['_id']),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  margin: EdgeInsets.only(
-                                    right: doctor == _therapists.first ? 6 : 0,
-                                    left: doctor == _therapists.last ? 6 : 0,
-                                  ),
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? const Color(0xFFF0FDFA) : Colors.white,
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
-                                      width: isSelected ? 2 : 1,
+                        SizedBox(
+                          height: 130,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _therapists.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 12),
+                            itemBuilder: (context, index) {
+                              final doctor = _therapists[index];
+                              final doctorId = doctor['_id']?.toString() ?? '';
+                              final isSelected = _selectedTherapistId == doctorId;
+                              final cardWidth = _therapists.length <= 2
+                                  ? (MediaQuery.of(context).size.width - 56) / 2
+                                  : 140.0;
+                              return SizedBox(
+                                width: cardWidth,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() => _selectedTherapistId = doctorId);
+                                    _fetchAvailableSlots();
+                                  },
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 150),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? const Color(0xFFF0FDFA) : Colors.white,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                                        width: isSelected ? 2 : 1,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.02),
+                                          blurRadius: 6,
+                                          offset: const Offset(0, 2),
+                                        )
+                                      ],
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.02),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      )
-                                    ],
-                                  ),
-                                  child: Column(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
-                                        child: Container(
-                                          width: 48,
-                                          height: 54,
-                                          color: const Color(0xFFE0F2FE),
-                                          child: Image.asset(
-                                          (doctor['image'] != null && (doctor['image'] as String).isNotEmpty)
-                                              ? doctor['image']
-                                              : ((doctor['_id'] == 'dr_rajnish' || (doctor['name'] ?? '').toString().toLowerCase().contains('rajnish'))
-                                                  ? 'assets/images/dr_rajnish_head.png'
-                                                  : 'assets/images/dr_priyanka_head.png'),
-                                          fit: BoxFit.cover,
-                                          alignment: Alignment.topCenter,
-                                          errorBuilder: (_, __, ___) => const Icon(Icons.person, color: Color(0xFF0F766E)),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(12),
+                                          child: Container(
+                                            width: 48,
+                                            height: 52,
+                                            color: const Color(0xFFE0F2FE),
+                                            child: _buildTherapistImage(doctor),
+                                          ),
                                         ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          doctor['name'] ?? '',
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF0F172A),
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 8),
-                                      Text(
-                                        doctor['name'] ?? '',
-                                        textAlign: TextAlign.center,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF0F172A),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          doctor['qualification'] ?? 'BPT, MIAP',
+                                          textAlign: TextAlign.center,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
                                         ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        doctor['qualification'] ?? 'BPT, MIAP',
-                                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }).toList(),
+                              );
+                            },
+                          ),
                         ),
                         const SizedBox(height: 20),
 
@@ -579,7 +720,10 @@ class _BookingScreenState extends State<BookingScreen> {
                               final isSelected = DateUtils.isSameDay(date, _selectedDate);
 
                               return GestureDetector(
-                                onTap: () => setState(() => _selectedDate = date),
+                                onTap: () {
+                                  setState(() => _selectedDate = date);
+                                  _fetchAvailableSlots();
+                                },
                                 child: AnimatedContainer(
                                   duration: const Duration(milliseconds: 150),
                                   width: 64,
@@ -631,9 +775,20 @@ class _BookingScreenState extends State<BookingScreen> {
                         const SizedBox(height: 24),
 
                         // Time Slot Selector
-                        const Text(
-                          'Select Time / समय स्लॉट',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Select Time / समय स्लॉट',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            if (_isSlotsLoading)
+                              const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F766E)),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 10),
                         GridView.builder(
@@ -648,28 +803,50 @@ class _BookingScreenState extends State<BookingScreen> {
                           ),
                           itemBuilder: (context, index) {
                             final slot = _slots[index];
+                            final isBooked = _bookedSlots.contains(slot.toUpperCase().trim());
                             final isSelected = _selectedSlot == slot;
 
                             return GestureDetector(
-                              onTap: () => setState(() => _selectedSlot = slot),
+                              onTap: isBooked ? null : () => setState(() => _selectedSlot = slot),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 150),
                                 decoration: BoxDecoration(
-                                  color: isSelected ? const Color(0xFF0F766E) : Colors.white,
+                                  color: isBooked
+                                      ? const Color(0xFFF1F5F9)
+                                      : (isSelected ? const Color(0xFF0F766E) : Colors.white),
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
-                                    color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                                    color: isBooked
+                                        ? const Color(0xFFE2E8F0)
+                                        : (isSelected ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0)),
                                     width: 1.2,
                                   ),
                                 ),
                                 alignment: Alignment.center,
-                                child: Text(
-                                  slot,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                                    color: isSelected ? Colors.white : const Color(0xFF0F172A),
-                                  ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      slot,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                        color: isBooked
+                                            ? const Color(0xFF94A3B8)
+                                            : (isSelected ? Colors.white : const Color(0xFF0F172A)),
+                                        decoration: isBooked ? TextDecoration.lineThrough : null,
+                                      ),
+                                    ),
+                                    if (isBooked)
+                                      const Text(
+                                        'Booked',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFEF4444),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ),
                             );

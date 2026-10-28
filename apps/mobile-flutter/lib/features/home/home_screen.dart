@@ -153,6 +153,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _apiService.get('/therapists').catchError((_) => Response(requestOptions: RequestOptions(path: '/therapists'), statusCode: 500)),
         _apiService.fetchCmsBanners().catchError((_) => ApiService.defaultBanners),
         _apiService.fetchCmsFaqs().catchError((_) => ApiService.defaultFaqs),
+        _apiService.fetchCmsContactDetails().catchError((_) => null),
       ]);
 
       final patientRes = results[0] as Response;

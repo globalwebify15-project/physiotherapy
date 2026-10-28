@@ -11,7 +11,6 @@ import 'features/offers/offers_screen.dart';
 import 'features/booking/booking_screen.dart';
 import 'features/appointments/appointments_screen.dart';
 import 'features/exercises/exercises_screen.dart';
-import 'features/pain_tracker/pain_tracker_screen.dart';
 import 'features/home/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/theme_provider.dart';
@@ -98,10 +97,6 @@ class PhysioApp extends ConsumerWidget {
         GoRoute(
           path: '/exercises',
           builder: (context, state) => const ExercisesScreen(),
-        ),
-        GoRoute(
-          path: '/pain_tracker',
-          builder: (context, state) => const PainTrackerScreen(),
         ),
         GoRoute(
           path: '/profile',
