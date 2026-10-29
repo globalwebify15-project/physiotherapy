@@ -70,6 +70,7 @@ class _BookingScreenState extends State<BookingScreen> {
   late Razorpay _razorpay;
   String? _pendingAppointmentId;
   String? _pendingPaymentId;
+  String? _pendingOrderId;
 
   bool _isLoading = true;
   bool _isSlotsLoading = false;
@@ -95,7 +96,7 @@ class _BookingScreenState extends State<BookingScreen> {
       await _apiService.post('/payments/verify', data: {
         'paymentId': _pendingPaymentId,
         'razorpayPaymentId': response.paymentId,
-        'razorpayOrderId': response.orderId,
+        'razorpayOrderId': response.orderId ?? _pendingOrderId,
         'razorpaySignature': response.signature,
       });
     } catch (e) {
@@ -442,8 +443,9 @@ class _BookingScreenState extends State<BookingScreen> {
             _pendingPaymentId = payData['paymentId']?.toString() ??
                 (payData['payment'] is Map ? payData['payment']['_id']?.toString() : null);
             final orderId = payData['orderId']?.toString();
+            _pendingOrderId = orderId;
             final amount = payData['amount'] ?? 80000;
-            final keyId = payData['keyId']?.toString() ?? 'rzp_test_TssirY8P33aIzy';
+            final keyId = payData['keyId']?.toString() ?? 'rzp_test_TtdXW7UMYbdFAC';
 
             var options = {
               'key': keyId,
@@ -453,9 +455,9 @@ class _BookingScreenState extends State<BookingScreen> {
               'order_id': orderId,
               'timeout': 300,
               'prefill': {
-                'contact': userMobile,
-                'email': userEmail,
-                'name': userName,
+                'contact': userMobile.isNotEmpty ? userMobile : '9876543210',
+                'email': userEmail.isNotEmpty ? userEmail : 'patient@quickphysio24.com',
+                'name': userName.isNotEmpty ? userName : 'Patient',
               },
               'theme': {
                 'color': '#0F766E',

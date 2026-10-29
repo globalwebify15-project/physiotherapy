@@ -4,8 +4,8 @@ import { getAuthenticatedUser } from '@/utils/auth';
 import Razorpay from 'razorpay';
 
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret_placeholder',
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_TtdXW7UMYbdFAC',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'hk4WnpbdCMVTU28XYKntNLn2',
 });
 
 // POST /api/payments - Initiate Razorpay Payment Order
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       amount: order.amount,
       currency: order.currency,
       paymentId: payment._id,
-      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TssirY8P33aIzy',
+      keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_TtdXW7UMYbdFAC',
     });
   } catch (error: any) {
     console.error('Error creating payment order:', error);

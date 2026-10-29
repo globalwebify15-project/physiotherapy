@@ -3,7 +3,7 @@ import { connectDB, Appointment, Payment, Patient, User } from 'database';
 import crypto from 'crypto';
 import { createNotification } from '@/utils/notifications';
 
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'rzp_test_secret_placeholder';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'hk4WnpbdCMVTU28XYKntNLn2';
 
 // POST /api/payments/verify - Verify Razorpay payment signature
 export async function POST(request: NextRequest) {
