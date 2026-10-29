@@ -68,7 +68,21 @@ class _LoginScreenState extends State<LoginScreen> {
             print('[Firebase Auto Verification]: $autoErr');
           }
         },
-        verificationFailed: (FirebaseAuthException e) {
+        verificationFailed: (FirebaseAuthException e) async {
+          // If Phone provider is disabled in Firebase or not allowed yet, fallback to backend OTP
+          if (e.code == 'operation-not-allowed' || e.code == 'app-not-authorized') {
+            try {
+              final response = await _apiService.post('/auth/otp/send', data: {
+                'mobile': mobile,
+              });
+              if (response.statusCode == 200 && mounted) {
+                setState(() => _isLoading = false);
+                context.push('/otp?mobile=$mobile');
+                return;
+              }
+            } catch (_) {}
+          }
+
           if (mounted) {
             setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
