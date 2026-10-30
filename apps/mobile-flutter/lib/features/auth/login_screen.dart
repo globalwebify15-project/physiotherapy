@@ -69,14 +69,28 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         },
         verificationFailed: (FirebaseAuthException e) async {
-          // If Phone provider is disabled in Firebase or not allowed yet, fallback to backend OTP
-          if (e.code == 'operation-not-allowed' || e.code == 'app-not-authorized') {
+          // If Phone provider has billing disabled, not authorized, or any Firebase SMS failure, fallback to backend OTP
+          final isBillingOrConfigError = (e.message ?? '').contains('BILLING_NOT_ENABLED') ||
+              e.code == 'billing-not-enabled' ||
+              e.code == 'operation-not-allowed' ||
+              e.code == 'app-not-authorized' ||
+              e.code == 'internal-error';
+
+          if (isBillingOrConfigError) {
             try {
               final response = await _apiService.post('/auth/otp/send', data: {
                 'mobile': mobile,
               });
               if (response.statusCode == 200 && mounted) {
                 setState(() => _isLoading = false);
+                final testOtp = response.data?['otp']?.toString() ?? '123456';
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Firebase SMS billing inactive. Verification code: $testOtp'),
+                    backgroundColor: const Color(0xFF0F766E),
+                    duration: const Duration(seconds: 8),
+                  ),
+                );
                 context.push('/otp?mobile=$mobile');
                 return;
               }
@@ -111,6 +125,14 @@ class _LoginScreenState extends State<LoginScreen> {
         });
 
         if (response.statusCode == 200 && mounted) {
+          final testOtp = response.data?['otp']?.toString() ?? '123456';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Firebase SMS inactive. Verification code: $testOtp'),
+              backgroundColor: const Color(0xFF0F766E),
+              duration: const Duration(seconds: 8),
+            ),
+          );
           context.push('/otp?mobile=$mobile');
         }
       } catch (err) {
