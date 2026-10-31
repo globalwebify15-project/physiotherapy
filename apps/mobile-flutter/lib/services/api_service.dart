@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../utils/app_storage.dart';
 import '../utils/phone_helper.dart';
 
 class ApiService {
   final Dio _dio = Dio();
-  final _storage = const FlutterSecureStorage();
+  final _storage = AppStorage.instance;
 
   // Live Production Base URL:
   static const String _baseUrl = 'https://physiotherapy-backend-nextjs.vercel.app/api';

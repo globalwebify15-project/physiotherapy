@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../utils/app_storage.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
@@ -26,7 +26,7 @@ class BookingScreen extends StatefulWidget {
 
 class _BookingScreenState extends State<BookingScreen> {
   final _apiService = ApiService();
-  final _storage = const FlutterSecureStorage();
+  final _storage = AppStorage.instance;
   
   List<dynamic> _services = [];
   List<dynamic> _therapists = [

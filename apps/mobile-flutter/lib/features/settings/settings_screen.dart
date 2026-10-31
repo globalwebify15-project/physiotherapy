@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../utils/app_storage.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -15,7 +15,7 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  final _storage = const FlutterSecureStorage();
+  final _storage = AppStorage.instance;
   final _apiService = ApiService();
 
   String _userName = 'Patient';

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../services/api_service.dart';
+import '../../utils/app_storage.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -14,7 +14,6 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _mobileController = TextEditingController();
   final _apiService = ApiService();
-  final _storage = const FlutterSecureStorage();
   bool _isLoading = false;
 
   @override
@@ -53,10 +52,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
             if (response.statusCode == 200 && mounted) {
               final data = response.data;
-              await _storage.write(key: 'accessToken', value: data['accessToken']);
-              await _storage.write(key: 'refreshToken', value: data['refreshToken']);
-              await _storage.write(key: 'patientId', value: data['patient']?['id'] ?? 'patient_$mobile');
-              await _storage.write(key: 'userMobile', value: mobile);
+              await AppStorage.write(key: 'accessToken', value: data['accessToken']);
+              await AppStorage.write(key: 'refreshToken', value: data['refreshToken']);
+              await AppStorage.write(key: 'patientId', value: data['patient']?['id'] ?? 'patient_$mobile');
+              await AppStorage.write(key: 'userMobile', value: mobile);
 
               if (data['isNewUser'] == true) {
                 context.go('/register');

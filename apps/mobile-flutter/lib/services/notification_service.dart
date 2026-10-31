@@ -1,7 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../utils/app_storage.dart';
 import 'api_service.dart';
 
 @pragma('vm:entry-point')
@@ -83,8 +83,7 @@ class NotificationService {
     if (t == null || t.isEmpty) return;
 
     try {
-      final storage = FlutterSecureStorage();
-      final currentMobile = await storage.read(key: 'userMobile') ?? '';
+      final currentMobile = await AppStorage.read(key: 'userMobile') ?? '';
 
       await _apiService.post(
         '/notifications/token',

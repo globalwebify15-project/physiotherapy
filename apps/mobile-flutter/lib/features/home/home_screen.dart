@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../utils/app_storage.dart';
 import 'package:dio/dio.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
@@ -124,7 +124,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _fetchDashboardData() async {
-    final storage = const FlutterSecureStorage();
+    final storage = AppStorage.instance;
     final currentMobile = await storage.read(key: 'userMobile') ?? '';
     final cachedName = await storage.read(key: 'patientName_$currentMobile') ?? await storage.read(key: 'patientName');
     final cachedAddr = await storage.read(key: 'patientAddress_$currentMobile') ?? await storage.read(key: 'patientAddress');

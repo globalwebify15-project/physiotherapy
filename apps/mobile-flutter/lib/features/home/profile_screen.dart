@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../utils/app_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
@@ -15,7 +15,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _storage = const FlutterSecureStorage();
+  final _storage = AppStorage.instance;
   final _apiService = ApiService();
   final _picker = ImagePicker();
   bool _isLoading = true;
@@ -885,8 +885,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             title: 'Log Out',
                             isDestructive: true,
                             onTap: () async {
-                              const storage = FlutterSecureStorage();
-                              await storage.deleteAll();
+                              await AppStorage.deleteAll();
                               if (context.mounted) {
                                 context.go('/login');
                               }
