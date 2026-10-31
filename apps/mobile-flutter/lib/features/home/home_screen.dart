@@ -5,11 +5,13 @@ import 'package:go_router/go_router.dart';
 import '../../utils/app_storage.dart';
 import 'package:dio/dio.dart';
 import '../../services/api_service.dart';
+import '../../services/notification_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_bottom_nav.dart';
 import '../../widgets/service_infographic.dart';
 import '../../widgets/promo_dialog.dart';
 import '../../widgets/faq_section.dart';
+import '../../widgets/notifications_sheet.dart';
 import '../../utils/phone_helper.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -98,6 +100,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    NotificationService().registerTokenWithBackend();
     _fetchDashboardData();
     _startBannerTimer();
   }
@@ -720,11 +723,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             userName: _patientName,
             locationAddress: _locationAddress,
             onSearchTap: () => context.push('/all_services'),
-            onNotificationTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('No new notifications')),
-              );
-            },
+            onNotificationTap: () => showNotificationsSheet(context),
           ),
 
           // 2. Main Scrollable Dashboard Content

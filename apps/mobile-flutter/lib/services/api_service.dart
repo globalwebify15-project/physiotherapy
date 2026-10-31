@@ -677,7 +677,9 @@ class ApiService {
           requestOptions: RequestOptions(path: path),
           statusCode: 200,
           data: {
-            'orderId': 'order_mock_${DateTime.now().millisecondsSinceEpoch}',
+            'orderId': null,
+            'keyId': 'rzp_test_TtdXW7UMYbdFAC',
+            'amount': 65000,
           },
         );
       }

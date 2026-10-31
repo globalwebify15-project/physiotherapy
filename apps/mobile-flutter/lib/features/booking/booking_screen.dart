@@ -116,11 +116,15 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   void _handlePaymentError(PaymentFailureResponse response) {
+    debugPrint('[Razorpay Error Code]: ${response.code}, message: ${response.message}');
     if (mounted) {
       setState(() => _isBookingSubmitting = false);
+      final errMsg = (response.message != null && response.message!.isNotEmpty && response.message != 'null')
+          ? response.message!
+          : 'Payment cancelled or dismissed';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Payment Incomplete: ${response.message ?? "Transaction not completed"}'),
+          content: Text('Payment: $errMsg'),
           backgroundColor: const Color(0xFFEF4444),
         ),
       );
@@ -433,9 +437,15 @@ class _BookingScreenState extends State<BookingScreen> {
 
       // 2. If Online Payment is selected, trigger Razorpay Gateway
       if (_selectedPaymentMethod == 'online') {
+        final num currentPrice = _selectedVisitType == 'home'
+            ? (selectedService['homePrice'] ?? 950)
+            : (selectedService['clinicPrice'] ?? 650);
+
         try {
           final paymentRes = await _apiService.post('/payments', data: {
             'appointmentId': apptId,
+            'amount': currentPrice,
+            'mobile': userMobile,
           });
 
           final payData = paymentRes.data;
@@ -444,15 +454,22 @@ class _BookingScreenState extends State<BookingScreen> {
                 (payData['payment'] is Map ? payData['payment']['_id']?.toString() : null);
             final orderId = payData['orderId']?.toString();
             _pendingOrderId = orderId;
-            final amount = payData['amount'] ?? 80000;
+            final amount = (payData['amount'] is num)
+                ? (payData['amount'] as num).toInt()
+                : (currentPrice * 100).toInt();
             final keyId = payData['keyId']?.toString() ?? 'rzp_test_TtdXW7UMYbdFAC';
 
-            var options = {
+            // Only attach order_id if it's a real order id from Razorpay server
+            final bool isRealRazorpayOrder = orderId != null &&
+                orderId.startsWith('order_') &&
+                !orderId.contains('sandbox') &&
+                !orderId.contains('mock');
+
+            var options = <String, dynamic>{
               'key': keyId,
               'amount': amount,
-              'name': "Dr. Bariyar's Physiotherapy",
+              'name': 'QuickPhysio24',
               'description': 'Booking: ${selectedService['title']}',
-              'order_id': orderId,
               'timeout': 300,
               'prefill': {
                 'contact': userMobile.isNotEmpty ? userMobile : '9876543210',
@@ -464,11 +481,25 @@ class _BookingScreenState extends State<BookingScreen> {
               }
             };
 
+            if (isRealRazorpayOrder) {
+              options['order_id'] = orderId;
+            }
+
             _razorpay.open(options);
             return;
           }
         } catch (payErr) {
-          print('[Razorpay Error]: $payErr');
+          debugPrint('[Razorpay Error]: $payErr');
+          if (mounted) {
+            setState(() => _isBookingSubmitting = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Payment Gateway Error: $payErr'),
+                backgroundColor: const Color(0xFFEF4444),
+              ),
+            );
+          }
+          return;
         }
       }
 

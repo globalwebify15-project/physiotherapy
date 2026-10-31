@@ -1,6 +1,7 @@
 import React from 'react';
 import { connectDB, Notification, User, Patient } from 'database';
 import { revalidatePath } from 'next/cache';
+import { createNotification } from '@/utils/notifications';
 import { 
   Bell, 
   Send, 
@@ -26,46 +27,17 @@ async function broadcastNotificationAction(formData: FormData) {
 
   await connectDB();
 
-  if (targetType === 'all') {
-    // Broadcast to all patient users
-    const patientUsers = await User.find({ role: 'patient' });
-    if (patientUsers.length > 0) {
-      const docs = patientUsers.map((u) => ({
-        userId: u._id,
-        title,
-        body,
-        type: notifType,
-        isRead: false,
-      }));
-      await Notification.insertMany(docs);
-    }
-  } else {
-    // Send to specific user
-    await Notification.create({
-      userId: targetType,
-      title,
-      body,
-      type: notifType,
-      isRead: false,
-    });
-  }
-
-  // Trigger push dispatch through backend FCM service
   try {
-    const backendUrl = process.env.BASE_URL || 'https://physiotherapy-backend-nextjs.vercel.app';
-    await fetch(`${backendUrl.replace(/\/$/, '')}/api/notifications`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        targetType,
-        userId: targetType !== 'all' ? targetType : undefined,
-        title,
-        body,
-        type: notifType,
-      }),
-    });
-  } catch (pushErr) {
-    console.warn('[FCM PUSH DISPATCH WARNING]:', pushErr);
+    if (targetType === 'all') {
+      const patientUsers = await User.find({ role: 'patient' });
+      for (const u of patientUsers) {
+        await createNotification(u._id, title, body, notifType as any);
+      }
+    } else {
+      await createNotification(targetType, title, body, notifType as any);
+    }
+  } catch (err) {
+    console.error('[BROADCAST NOTIFICATION ACTION ERROR]:', err);
   }
 
   revalidatePath('/admin/notifications');

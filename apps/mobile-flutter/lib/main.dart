@@ -17,6 +17,9 @@ import 'features/settings/theme_provider.dart';
 import 'features/auth/register_screen.dart';
 import 'services/notification_service.dart';
 
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
@@ -40,6 +43,7 @@ class PhysioApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
 
     final GoRouter router = GoRouter(
+      navigatorKey: rootNavigatorKey,
       initialLocation: '/',
       routes: [
         GoRoute(
@@ -119,6 +123,7 @@ class PhysioApp extends ConsumerWidget {
 
     return MaterialApp.router(
       title: 'QuickPhysio24.com',
+      scaffoldMessengerKey: rootScaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
       themeMode: themeMode,

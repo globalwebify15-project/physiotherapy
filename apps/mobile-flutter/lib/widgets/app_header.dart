@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'notifications_sheet.dart';
 import 'package:go_router/go_router.dart';
 
 class AppHeader extends StatelessWidget {
@@ -131,11 +132,7 @@ class AppHeader extends StatelessWidget {
 
         // Notification Bell
         IconButton(
-          onPressed: onNotificationTap ?? () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('No new notifications')),
-            );
-          },
+          onPressed: onNotificationTap ?? () => showNotificationsSheet(context),
           icon: const Icon(
             Icons.notifications_none_rounded,
             color: Colors.white,
