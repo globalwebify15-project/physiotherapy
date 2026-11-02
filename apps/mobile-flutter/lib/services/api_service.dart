@@ -831,5 +831,31 @@ class ApiService {
     }
     return null;
   }
+
+  /// Fetches live clinic profile, founder story, experience and accreditations from MongoDB CMS
+  Future<Map<String, dynamic>?> fetchCmsAboutClinic() async {
+    try {
+      final res = await get('/cms', queryParameters: {'key': 'about_clinic'});
+      if (res.statusCode == 200 && res.data != null) {
+        dynamic content = res.data['content'];
+        if (content == null && res.data['cmsBlocks'] is List) {
+          final block = (res.data['cmsBlocks'] as List).firstWhere(
+            (b) => b['key'] == 'about_clinic',
+            orElse: () => null,
+          );
+          if (block != null) content = block['content'];
+        }
+
+        if (content is Map) {
+          final map = Map<String, dynamic>.from(content);
+          PhoneHelper.updateAboutFromCms(map);
+          return map;
+        }
+      }
+    } catch (e) {
+      print('[fetchCmsAboutClinic Warning]: $e');
+    }
+    return null;
+  }
 }
 

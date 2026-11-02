@@ -157,6 +157,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _apiService.fetchCmsBanners().catchError((_) => ApiService.defaultBanners),
         _apiService.fetchCmsFaqs().catchError((_) => ApiService.defaultFaqs),
         _apiService.fetchCmsContactDetails().catchError((_) => null),
+        _apiService.fetchCmsAboutClinic().catchError((_) => null),
       ]);
 
       final patientRes = results[0] as Response;
@@ -664,11 +665,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Need immediate assistance, ambulance support, or therapist booking help?',
+                'Need immediate assistance, clinic directions, or therapist booking help?',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 14),
+
+              // Clinic Working Hours Banner
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF99F6E4)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.access_time_filled_rounded, color: Color(0xFF0F766E), size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      PhoneHelper.workingHours,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
 
               Row(
                 children: [
@@ -679,7 +704,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         PhoneHelper.makePhoneCall(PhoneHelper.helplinePhone, context: context);
                       },
                       icon: const Icon(Icons.call_rounded, size: 18),
-                      label: const Text('Call Support'),
+                      label: const Text('Call Helpline'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F766E),
                         foregroundColor: Colors.white,
@@ -696,7 +721,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         PhoneHelper.openWhatsApp(context: context);
                       },
                       icon: const Icon(Icons.chat_rounded, size: 18),
-                      label: const Text('Chat Support'),
+                      label: const Text('WhatsApp'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF059669),
                         foregroundColor: Colors.white,
@@ -709,6 +734,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 10),
+
+              // Full Contact & Doctor Directory Link
+              SizedBox(
+                width: double.infinity,
+                child: TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    context.push('/contact_us');
+                  },
+                  icon: const Icon(Icons.map_rounded, size: 18, color: Color(0xFF0F766E)),
+                  label: const Text(
+                    'View Clinic Address & Doctor Lines',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                  ),
+                ),
+              ),
             ],
           ),
         );
@@ -1093,6 +1134,113 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                           // Creative Doctors Showcase Banner (Standing Together)
                           _buildDoctorShowcaseBanner(),
+                          const SizedBox(height: 28),
+
+                          // About Clinic & Accreditations Spotlight Card (Live CMS)
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF042F2E), Color(0xFF0F766E)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(24),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF0F766E).withOpacity(0.2),
+                                  blurRadius: 14,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: Colors.white.withOpacity(0.2)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.verified_user_rounded, color: Color(0xFF5EEAD4), size: 14),
+                                          SizedBox(width: 5),
+                                          Text(
+                                            'Recognized Clinical Center',
+                                            style: TextStyle(color: Color(0xFFCCFBF1), fontSize: 11, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Text(
+                                      PhoneHelper.clinicalExperience,
+                                      style: const TextStyle(color: Color(0xFF5EEAD4), fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  PhoneHelper.clinicHeadline,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w900,
+                                    height: 1.3,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  PhoneHelper.clinicBio,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withOpacity(0.85),
+                                    fontSize: 12,
+                                    height: 1.5,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => context.push('/about_clinic'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: const BorderSide(color: Color(0xFF5EEAD4)),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                        ),
+                                        child: const Text('Read Story & Mission', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => context.push('/contact_us'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF5EEAD4),
+                                          foregroundColor: const Color(0xFF042F2E),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                          padding: const EdgeInsets.symmetric(vertical: 10),
+                                          elevation: 0,
+                                        ),
+                                        child: const Text('Clinic Address & Help', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
                           const SizedBox(height: 28),
 
                           // Frequently Asked Questions Section (Dynamic from CMS)

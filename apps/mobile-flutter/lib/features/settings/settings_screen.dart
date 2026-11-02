@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/app_storage.dart';
+import '../../utils/phone_helper.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -29,6 +30,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadUserProfile();
+    _loadCmsData();
+  }
+
+  Future<void> _loadCmsData() async {
+    try {
+      await Future.wait([
+        _apiService.fetchCmsAboutClinic(),
+        _apiService.fetchCmsContactDetails(),
+      ]);
+      if (mounted) setState(() {});
+    } catch (_) {}
   }
 
   Future<void> _loadUserProfile() async {
@@ -259,6 +271,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           child: const Text('Edit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
                         ),
                       ],
+                    ),
+                  ),
+
+                  _buildSectionHeader('Clinic & Patient Support'),
+
+                  // 1. About Clinic & Doctor Profiles (Live CMS)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: ListTile(
+                      onTap: () => context.push('/about_clinic'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFF0FDFA),
+                        child: Icon(Icons.local_hospital_rounded, color: Color(0xFF0F766E), size: 22),
+                      ),
+                      title: Text(
+                        PhoneHelper.clinicHeadline,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      subtitle: Text(
+                        '${PhoneHelper.clinicalExperience} Experience • ${PhoneHelper.treatedPatients} Patients',
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+
+                  // 2. Calling & WhatsApp Support Channels (Live CMS)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: ListTile(
+                      onTap: () => context.push('/contact_us'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFECFDF5),
+                        child: Icon(Icons.headset_mic_rounded, color: Color(0xFF059669), size: 22),
+                      ),
+                      title: const Text(
+                        'Contact Channels & Help Desk',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      subtitle: Text(
+                        '${PhoneHelper.helplinePhone} • WhatsApp • Address',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                     ),
                   ),
 
