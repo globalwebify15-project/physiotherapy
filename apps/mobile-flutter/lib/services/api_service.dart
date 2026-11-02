@@ -525,22 +525,22 @@ class ApiService {
         await _storage.write(key: 'userMobile', value: userMobile);
 
         // Check if user has already registered a profile with this mobile
-        final existingName = await _storage.read(key: 'patientName_$userMobile');
-        final isNewUser = (existingName == null || existingName.trim().isEmpty) && userMobile != '9334306358';
+        final existingName = await _storage.read(key: 'patientName_$userMobile') ?? await _storage.read(key: 'patientName');
+        final isNewUser = (existingName == null || existingName.trim().isEmpty);
 
-        String activeName = existingName ?? (userMobile == '9334306358' ? 'Amarjeet Pandey' : '');
+        String activeName = existingName ?? '';
         await _storage.write(key: 'patientName', value: activeName);
 
-        final existingAddr = await _storage.read(key: 'patientAddress_$userMobile') ?? (userMobile == '9334306358' ? 'Ashok Nagar, Ranchi, Jharkhand' : '');
+        final existingAddr = await _storage.read(key: 'patientAddress_$userMobile') ?? await _storage.read(key: 'patientAddress') ?? '';
         await _storage.write(key: 'patientAddress', value: existingAddr);
 
-        final existingEmail = await _storage.read(key: 'patientEmail_$userMobile') ?? (userMobile == '9334306358' ? 'amarjeet@globalwebify.com' : '');
+        final existingEmail = await _storage.read(key: 'patientEmail_$userMobile') ?? await _storage.read(key: 'patientEmail') ?? '';
         await _storage.write(key: 'patientEmail', value: existingEmail);
 
-        final existingPhoto = await _storage.read(key: 'patientPhoto_$userMobile') ?? '';
+        final existingPhoto = await _storage.read(key: 'patientPhoto_$userMobile') ?? await _storage.read(key: 'patientPhoto') ?? '';
         await _storage.write(key: 'patientPhoto', value: existingPhoto);
 
-        final existingHistory = await _storage.read(key: 'patientMedicalHistory_$userMobile') ?? (userMobile == '9334306358' ? 'Post-Surgery Rehab|||Routine Physiotherapy Checkup' : '');
+        final existingHistory = await _storage.read(key: 'patientMedicalHistory_$userMobile') ?? await _storage.read(key: 'patientMedicalHistory') ?? '';
         await _storage.write(key: 'patientMedicalHistory', value: existingHistory);
 
         return Response(

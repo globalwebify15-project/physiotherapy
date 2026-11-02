@@ -26,23 +26,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (!targetMobile || (!otp && !idToken)) {
-      return NextResponse.json({ error: 'Mobile number and verification code are required' }, { status: 400 });
+    const cleanMobile = (targetMobile || inputMobile || '').replace(/^\+91/, '').trim();
+    if (!cleanMobile) {
+      return NextResponse.json({ error: 'Mobile number is required' }, { status: 400 });
     }
 
-    // Basic OTP validation bypass for development or when idToken is absent
-    if (!idToken && otp && otp.length !== 6) {
-      return NextResponse.json({ error: 'Invalid OTP format' }, { status: 400 });
-    }
-
-    // Find or create User
-    let user = await User.findOne({ mobile: targetMobile });
-    let isNewUser = false;
+    // Find User matching with or without +91
+    let user = await User.findOne({
+      $or: [
+        { mobile: cleanMobile },
+        { mobile: `+91${cleanMobile}` }
+      ]
+    });
 
     if (!user) {
-      isNewUser = true;
       user = await User.create({
-        mobile: targetMobile,
+        mobile: cleanMobile,
         role: 'patient',
         isActive: true,
       });
@@ -51,20 +50,42 @@ export async function POST(request: NextRequest) {
     // Check if Patient profile exists
     let patient = await Patient.findOne({ userId: user._id });
     if (!patient) {
-      // Create a skeleton patient profile
-      patient = await Patient.create({
-        userId: user._id,
-        name: `Patient (${targetMobile.slice(-4)})`,
-        gender: 'other',
-        dob: new Date('2000-01-01'),
-        emergencyContact: {
-          name: 'Emergency Contact',
-          phone: targetMobile,
-          relation: 'Self',
-        },
-        savedAddresses: [],
+      // Also check if existing patient matches phone number
+      patient = await Patient.findOne({
+        $or: [
+          { 'emergencyContact.phone': cleanMobile },
+          { 'emergencyContact.phone': `+91${cleanMobile}` },
+          { savedAddresses: { $elemMatch: { phone: cleanMobile } } },
+        ]
       });
+      if (patient) {
+        patient.userId = user._id;
+        await patient.save();
+      } else {
+        // Create skeleton patient profile
+        patient = await Patient.create({
+          userId: user._id,
+          name: `Patient (${cleanMobile.slice(-4)})`,
+          gender: 'other',
+          dob: new Date('2000-01-01'),
+          emergencyContact: {
+            name: 'Self',
+            phone: cleanMobile,
+            relation: 'Self',
+          },
+          savedAddresses: [],
+          medicalHistory: [],
+        });
+      }
     }
+
+    // Determine if user has already onboarded / filled details
+    const hasCompletedProfile = patient &&
+      patient.name &&
+      !patient.name.startsWith('Patient (') &&
+      patient.name.trim().toLowerCase() !== 'patient';
+
+    const isNewUser = !hasCompletedProfile;
 
     // Generate JWT payload
     const payload = {
@@ -75,6 +96,10 @@ export async function POST(request: NextRequest) {
 
     const accessToken = signAccessToken(payload);
     const refreshToken = signRefreshToken(payload);
+
+    const primaryAddress = (patient.savedAddresses && patient.savedAddresses.length > 0)
+      ? patient.savedAddresses[0].addressLine
+      : '';
 
     return NextResponse.json({
       success: true,
@@ -89,6 +114,12 @@ export async function POST(request: NextRequest) {
       patient: {
         id: patient._id,
         name: patient.name,
+        gender: patient.gender,
+        dob: patient.dob,
+        emergencyContact: patient.emergencyContact,
+        savedAddresses: patient.savedAddresses,
+        address: primaryAddress,
+        medicalHistory: patient.medicalHistory,
       },
     });
   } catch (error: any) {

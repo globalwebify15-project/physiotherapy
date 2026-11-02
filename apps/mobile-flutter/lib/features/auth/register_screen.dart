@@ -242,6 +242,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       final payload = {
         'name': name,
+        'mobile': mobile,
         'email': email,
         'gender': _gender,
         'dob': _dob.toIso8601String(),
@@ -253,7 +254,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           'phone': emergPhone,
           'relation': emergRel,
         },
-        'savedAddresses': addresses.isNotEmpty ? addresses : (mainAddr.isNotEmpty ? [mainAddr] : []),
+        'savedAddresses': addresses.isNotEmpty
+            ? addresses.map((a) => {'label': 'Home', 'addressLine': a, 'isDefault': true}).toList()
+            : (mainAddr.isNotEmpty ? [{'label': 'Home', 'addressLine': mainAddr, 'isDefault': true}] : []),
       };
 
       // Perform profile update/save API request

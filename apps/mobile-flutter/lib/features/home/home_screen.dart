@@ -169,10 +169,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (mounted) {
         setState(() {
           if (patientRes.statusCode == 200 && patientRes.data != null && patientRes.data['patient'] != null) {
-            final fetchedName = patientRes.data['patient']['name']?.toString() ?? '';
-            final fetchedAddress = patientRes.data['patient']['address']?.toString() ?? '';
-            if (fetchedName.isNotEmpty) _patientName = fetchedName;
-            if (fetchedAddress.isNotEmpty) _locationAddress = fetchedAddress;
+            final pData = patientRes.data['patient'];
+            final fetchedName = pData['name']?.toString() ?? '';
+            final fetchedAddress = pData['address']?.toString() ??
+                (pData['savedAddresses'] is List && (pData['savedAddresses'] as List).isNotEmpty
+                    ? pData['savedAddresses'][0]['addressLine']?.toString() ?? ''
+                    : '');
+            if (fetchedName.isNotEmpty && !fetchedName.startsWith('Patient (')) {
+              _patientName = fetchedName;
+              storage.write(key: 'patientName', value: fetchedName);
+              if (currentMobile.isNotEmpty) storage.write(key: 'patientName_$currentMobile', value: fetchedName);
+            }
+            if (fetchedAddress.isNotEmpty) {
+              _locationAddress = fetchedAddress;
+              storage.write(key: 'patientAddress', value: fetchedAddress);
+              if (currentMobile.isNotEmpty) storage.write(key: 'patientAddress_$currentMobile', value: fetchedAddress);
+            }
           }
 
           if (apptsRes.statusCode == 200 && apptsRes.data != null && apptsRes.data['appointments'] != null) {
