@@ -362,10 +362,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   ElevatedButton(
                                     onPressed: () async {
                                       Navigator.pop(ctx);
-                                      await _storage.delete(key: 'accessToken');
-                                      await _storage.delete(key: 'userMobile');
-                                      await _storage.delete(key: 'patientName');
-                                      await _storage.delete(key: 'patientAddress');
+                                      await AppStorage.deleteAll();
                                       if (mounted) {
                                         context.go('/login');
                                       }

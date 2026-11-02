@@ -16,6 +16,7 @@ import 'features/settings/settings_screen.dart';
 import 'features/settings/theme_provider.dart';
 import 'features/auth/register_screen.dart';
 import 'services/notification_service.dart';
+import 'utils/app_storage.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -28,15 +29,28 @@ void main() async {
     debugPrint('[NOTIFICATION INIT] Initialized with fallback: $e');
   }
 
+  // Persistent Login Session Check (Persists until manual logout or app uninstall)
+  String initialRoute = '/';
+  try {
+    final userMobile = await AppStorage.read(key: 'userMobile');
+    if (userMobile != null && userMobile.trim().isNotEmpty) {
+      initialRoute = '/home';
+    }
+  } catch (e) {
+    debugPrint('[SESSION CHECK ERROR]: $e');
+  }
+
   runApp(
-    const ProviderScope(
-      child: PhysioApp(),
+    ProviderScope(
+      child: PhysioApp(initialLocation: initialRoute),
     ),
   );
 }
 
 class PhysioApp extends ConsumerWidget {
-  const PhysioApp({super.key});
+  const PhysioApp({super.key, this.initialLocation = '/'});
+
+  final String initialLocation;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -44,7 +58,18 @@ class PhysioApp extends ConsumerWidget {
 
     final GoRouter router = GoRouter(
       navigatorKey: rootNavigatorKey,
-      initialLocation: '/',
+      initialLocation: initialLocation,
+      redirect: (context, state) async {
+        final userMobile = await AppStorage.read(key: 'userMobile');
+        final isLoggedIn = userMobile != null && userMobile.trim().isNotEmpty;
+        final loc = state.matchedLocation;
+
+        // If user is already authenticated, bypass onboarding and login
+        if (isLoggedIn && (loc == '/' || loc == '/login' || loc == '/otp')) {
+          return '/home';
+        }
+        return null;
+      },
       routes: [
         GoRoute(
           path: '/',
