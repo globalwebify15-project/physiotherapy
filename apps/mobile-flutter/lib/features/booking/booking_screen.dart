@@ -11,6 +11,7 @@ class BookingScreen extends StatefulWidget {
   final String? initialDoctorName;
   final String? initialServiceId;
   final String? initialServiceTitle;
+  final String? initialPromoCode;
 
   const BookingScreen({
     super.key,
@@ -18,6 +19,7 @@ class BookingScreen extends StatefulWidget {
     this.initialDoctorName,
     this.initialServiceId,
     this.initialServiceTitle,
+    this.initialPromoCode,
   });
 
   @override
@@ -27,6 +29,11 @@ class BookingScreen extends StatefulWidget {
 class _BookingScreenState extends State<BookingScreen> {
   final _apiService = ApiService();
   final _storage = AppStorage.instance;
+  final _promoController = TextEditingController();
+
+  List<Map<String, dynamic>> _availableOffers = [];
+  Map<String, dynamic>? _appliedCoupon;
+  String? _promoError;
   
   List<dynamic> _services = [];
   List<dynamic> _therapists = [
@@ -82,6 +89,7 @@ class _BookingScreenState extends State<BookingScreen> {
     _initRazorpay();
     _applyInitialSelections();
     _fetchBookingDetails();
+    _loadAvailableOffers();
   }
 
   void _initRazorpay() {
@@ -163,7 +171,128 @@ class _BookingScreenState extends State<BookingScreen> {
   void dispose() {
     _razorpay.clear();
     _addressController.dispose();
+    _promoController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAvailableOffers() async {
+    try {
+      final offers = await _apiService.fetchCmsOffers();
+      if (mounted) {
+        setState(() {
+          _availableOffers = offers;
+        });
+        if (widget.initialPromoCode != null && widget.initialPromoCode!.trim().isNotEmpty) {
+          _promoController.text = widget.initialPromoCode!.trim().toUpperCase();
+          _applyPromoCode();
+        }
+      }
+    } catch (e) {
+      debugPrint('[LoadOffers Error]: $e');
+    }
+  }
+
+  num _getBasePrice() {
+    final selectedService = _services.firstWhere(
+      (s) => s['_id']?.toString() == _selectedServiceId?.toString(),
+      orElse: () => {
+        '_id': '1',
+        'title': 'Physiotherapy Consultation',
+        'homePrice': 950,
+        'clinicPrice': 650
+      },
+    );
+    final num price = _selectedVisitType == 'home'
+        ? (selectedService['homePrice'] ?? 950)
+        : (selectedService['clinicPrice'] ?? 650);
+    return price;
+  }
+
+  num _getDiscountAmount() {
+    if (_appliedCoupon == null) return 0;
+    final basePrice = _getBasePrice();
+    final discountType = (_appliedCoupon!['discountType'] ?? 'percentage').toString();
+    final discountValue = num.tryParse(_appliedCoupon!['discountValue']?.toString() ?? '0') ?? 0;
+    final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
+
+    if (minAmount > 0 && basePrice < minAmount) {
+      return 0;
+    }
+
+    if (discountType == 'flat') {
+      return discountValue > basePrice ? basePrice : discountValue;
+    } else {
+      // Percentage
+      return (basePrice * discountValue) / 100;
+    }
+  }
+
+  num _getTotalPayable() {
+    final basePrice = _getBasePrice();
+    final discount = _getDiscountAmount();
+    return (basePrice - discount).clamp(0, basePrice);
+  }
+
+  void _applyPromoCode() {
+    final code = _promoController.text.trim().toUpperCase();
+    if (code.isEmpty) return;
+
+    final match = _availableOffers.firstWhere(
+      (o) => (o['code'] ?? '').toString().toUpperCase() == code,
+      orElse: () => {},
+    );
+
+    if (match.isEmpty) {
+      setState(() {
+        _appliedCoupon = null;
+        _promoError = 'Invalid promo code "$code". Please check and try again.';
+      });
+      return;
+    }
+
+    final minAmount = num.tryParse(match['minAmount']?.toString() ?? '0') ?? 0;
+    final basePrice = _getBasePrice();
+    if (minAmount > 0 && basePrice < minAmount) {
+      setState(() {
+        _appliedCoupon = null;
+        _promoError = 'Coupon requires minimum booking amount of ₹$minAmount.';
+      });
+      return;
+    }
+
+    setState(() {
+      _appliedCoupon = match;
+      _promoError = null;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Coupon "$code" applied! Saved ₹${_getDiscountAmount().toStringAsFixed(0)}.',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color(0xFF0F766E),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _removePromoCode() {
+    setState(() {
+      _appliedCoupon = null;
+      _promoController.clear();
+      _promoError = null;
+    });
   }
 
   Future<void> _fetchBookingDetails() async {
@@ -411,6 +540,10 @@ class _BookingScreenState extends State<BookingScreen> {
     final userName = await _storage.read(key: 'patientName') ?? 'Patient';
     final userEmail = await _storage.read(key: 'patientEmail') ?? 'patient@quickphysio24.com';
 
+    final basePrice = _getBasePrice();
+    final discount = _getDiscountAmount();
+    final finalPayable = _getTotalPayable();
+
     try {
       // 1. Create Appointment
       final apptRes = await _apiService.post('/appointments', data: {
@@ -423,6 +556,9 @@ class _BookingScreenState extends State<BookingScreen> {
         'address': _selectedVisitType == 'home' ? _addressController.text.trim() : null,
         'mobile': userMobile,
         'patientName': userName,
+        'couponCode': _appliedCoupon != null ? _appliedCoupon!['code'] : null,
+        'discount': discount,
+        'totalAmount': finalPayable,
       });
 
       final apptData = apptRes.data;
@@ -437,14 +573,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
       // 2. If Online Payment is selected, trigger Razorpay Gateway
       if (_selectedPaymentMethod == 'online') {
-        final num currentPrice = _selectedVisitType == 'home'
-            ? (selectedService['homePrice'] ?? 950)
-            : (selectedService['clinicPrice'] ?? 650);
-
         try {
           final paymentRes = await _apiService.post('/payments', data: {
             'appointmentId': apptId,
-            'amount': currentPrice,
+            'amount': finalPayable,
             'mobile': userMobile,
           });
 
@@ -456,7 +588,7 @@ class _BookingScreenState extends State<BookingScreen> {
             _pendingOrderId = orderId;
             final amount = (payData['amount'] is num)
                 ? (payData['amount'] as num).toInt()
-                : (currentPrice * 100).toInt();
+                : (finalPayable * 100).toInt();
             final keyId = payData['keyId']?.toString() ?? 'rzp_test_TtdXW7UMYbdFAC';
 
             // Only attach order_id if it's a real order id from Razorpay server
@@ -918,6 +1050,140 @@ class _BookingScreenState extends State<BookingScreen> {
                         ),
                         const SizedBox(height: 20),
 
+                        // Promo Code / Coupon Card
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: _appliedCoupon != null ? const Color(0xFF0F766E).withOpacity(0.4) : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.confirmation_number_outlined, size: 16, color: Color(0xFF0F766E)),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    'Have a Promo Code / Coupon?',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F172A),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  if (_appliedCoupon != null)
+                                    GestureDetector(
+                                      onTap: _removePromoCode,
+                                      child: const Text(
+                                        'Remove',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFEF4444),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              if (_appliedCoupon == null) ...[
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 42,
+                                        child: TextField(
+                                          controller: _promoController,
+                                          textCapitalization: TextCapitalization.characters,
+                                          decoration: InputDecoration(
+                                            hintText: 'e.g. PHYSIO25',
+                                            hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                            filled: true,
+                                            fillColor: const Color(0xFFF8FAFC),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(10),
+                                              borderSide: const BorderSide(color: Color(0xFF0F766E)),
+                                            ),
+                                          ),
+                                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, letterSpacing: 1.0),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    ElevatedButton(
+                                      onPressed: _applyPromoCode,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF0F766E),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                                        minimumSize: const Size(0, 42),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      ),
+                                      child: const Text(
+                                        'Apply',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (_promoError != null) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    _promoError!,
+                                    style: const TextStyle(fontSize: 11, color: Color(0xFFEF4444), fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ] else ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0FDFA),
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: const Color(0xFF99F6E4)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.check_circle_rounded, color: Color(0xFF0F766E), size: 18),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Coupon "${_appliedCoupon!['code']}" Applied!',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                                            ),
+                                            Text(
+                                              'Saved ₹${_getDiscountAmount().toStringAsFixed(0)} with ${_appliedCoupon!['discount'] ?? ''}',
+                                              style: const TextStyle(fontSize: 11, color: Color(0xFF0D9488)),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // Fee Breakdown Summary
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -937,7 +1203,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                     style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                                   ),
                                   Text(
-                                    _selectedVisitType == 'home' ? '₹950' : '₹650',
+                                    '₹${_getBasePrice().toStringAsFixed(0)}',
                                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                                   ),
                                 ],
@@ -956,6 +1222,22 @@ class _BookingScreenState extends State<BookingScreen> {
                                   ),
                                 ],
                               ),
+                              if (_appliedCoupon != null && _getDiscountAmount() > 0) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Coupon Discount (${_appliedCoupon!['code']})',
+                                      style: const TextStyle(fontSize: 13, color: Color(0xFF0F766E), fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      '-₹${_getDiscountAmount().toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                                    ),
+                                  ],
+                                ),
+                              ],
                               const Divider(height: 20, color: Color(0xFFE2E8F0)),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -965,7 +1247,7 @@ class _BookingScreenState extends State<BookingScreen> {
                                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
                                   ),
                                   Text(
-                                    _selectedVisitType == 'home' ? '₹950' : '₹650',
+                                    '₹${_getTotalPayable().toStringAsFixed(0)}',
                                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F766E)),
                                   ),
                                 ],

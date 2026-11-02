@@ -857,5 +857,87 @@ class ApiService {
     }
     return null;
   }
+
+  /// Fetches live promotional offers & discount coupons from MongoDB CMS
+  Future<List<Map<String, dynamic>>> fetchCmsOffers() async {
+    try {
+      final res = await get('/cms', queryParameters: {'key': 'offers'});
+      if (res.statusCode == 200 && res.data != null) {
+        dynamic content = res.data['content'];
+        if (content == null && res.data['cmsBlocks'] is List) {
+          final block = (res.data['cmsBlocks'] as List).firstWhere(
+            (b) => b['key'] == 'offers',
+            orElse: () => null,
+          );
+          if (block != null) content = block['content'];
+        }
+
+        if (content is List && content.isNotEmpty) {
+          final list = content
+              .map((e) => Map<String, dynamic>.from(e as Map))
+              .where((e) => e['isActive'] != false)
+              .toList();
+          if (list.isNotEmpty) return list;
+        }
+      }
+    } catch (e) {
+      print('[fetchCmsOffers Warning, using fallback offers]: $e');
+    }
+
+    return [
+      {
+        'id': 'offer_physio25',
+        'code': 'PHYSIO25',
+        'discount': '25% OFF',
+        'title': 'Physiotherapy Rehab Package',
+        'desc': 'Get 25% discount on booking 5 or more rehabilitation sessions.',
+        'validTill': 'Valid till 31 Dec 2026',
+        'tag': 'POPULAR',
+        'discountType': 'percentage',
+        'discountValue': 25,
+        'minAmount': 500,
+        'isActive': true,
+      },
+      {
+        'id': 'offer_carehome30',
+        'code': 'CAREHOME30',
+        'discount': '30% OFF',
+        'title': 'Home Care First Visit',
+        'desc': 'Flat 30% discount on your first home visit physiotherapy session.',
+        'validTill': 'Valid till 30 Nov 2026',
+        'tag': 'HOME VISIT',
+        'discountType': 'percentage',
+        'discountValue': 30,
+        'minAmount': 600,
+        'isActive': true,
+      },
+      {
+        'id': 'offer_flat150',
+        'code': 'HEAL150',
+        'discount': '₹150 OFF',
+        'title': 'Quick Relief Consultation',
+        'desc': 'Instant ₹150 off on clinic evaluation & spine checkup.',
+        'validTill': 'Valid till 31 Dec 2026',
+        'tag': 'INSTANT SAVINGS',
+        'discountType': 'flat',
+        'discountValue': 150,
+        'minAmount': 500,
+        'isActive': true,
+      },
+      {
+        'id': 'offer_neuro20',
+        'code': 'NEURO20',
+        'discount': '20% OFF',
+        'title': 'Neuro & Paralysis Care',
+        'desc': 'Special 20% discount on stroke, paralysis, and spine rehabilitation.',
+        'validTill': 'Valid till 31 Dec 2026',
+        'tag': 'SPECIAL CARE',
+        'discountType': 'percentage',
+        'discountValue': 20,
+        'minAmount': 700,
+        'isActive': true,
+      },
+    ];
+  }
 }
 

@@ -48,3 +48,4 @@ Please collect the following information from the client:
 3. Link the policies directly inside the mobile Flutter app:
    - In `SettingsScreen` (under "About & Legal").
    - In `LoginScreen` & `RegisterScreen` footer links.
+

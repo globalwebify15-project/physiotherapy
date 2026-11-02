@@ -113,11 +113,13 @@ class PhysioApp extends ConsumerWidget {
             final doctorName = extra?['doctorName'] as String? ?? state.uri.queryParameters['doctorName'];
             final serviceId = extra?['serviceId'] as String? ?? state.uri.queryParameters['serviceId'];
             final serviceTitle = extra?['serviceTitle'] as String? ?? state.uri.queryParameters['serviceTitle'];
+            final promoCode = extra?['promoCode'] as String? ?? state.uri.queryParameters['promoCode'];
             return BookingScreen(
               initialDoctorId: doctorId,
               initialDoctorName: doctorName,
               initialServiceId: serviceId,
               initialServiceTitle: serviceTitle,
+              initialPromoCode: promoCode,
             );
           },
         ),
