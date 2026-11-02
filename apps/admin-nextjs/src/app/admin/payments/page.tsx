@@ -70,7 +70,9 @@ export default async function PaymentsPage() {
         { path: 'serviceId', model: Service }
       ]
     })
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .limit(200)
+    .lean();
 
   // Calculate Metrics
   const totalRevenue = payments

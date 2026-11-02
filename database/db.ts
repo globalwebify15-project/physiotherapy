@@ -17,18 +17,46 @@ if (!MONGODB_URI) {
 
 const connectionString = MONGODB_URI;
 
+// Serverless-ready global connection cache to prevent connection pool churn
+declare global {
+  // eslint-disable-next-line no-var
+  var mongooseConnection: { conn: typeof mongoose | null; promise: Promise<typeof mongoose> | null } | undefined;
+}
+
+let cached = global.mongooseConnection;
+
+if (!cached) {
+  cached = global.mongooseConnection = { conn: null, promise: null };
+}
+
 export const connectDB = async () => {
   if (mongoose.connection.readyState >= 1) {
-    return;
+    return mongoose;
+  }
+
+  if (cached && cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached!.promise) {
+    cached!.promise = mongoose.connect(connectionString, {
+      maxPoolSize: 10,
+      serverSelectionTimeoutMS: 5000,
+    }).then((m) => {
+      console.log('MongoDB successfully connected.');
+      return m;
+    });
   }
 
   try {
-    await mongoose.connect(connectionString);
-    console.log('MongoDB successfully connected.');
+    cached!.conn = await cached!.promise;
   } catch (error) {
+    cached!.promise = null;
     console.error('MongoDB connection error:', error);
-    process.exit(1);
+    throw error;
   }
+
+  return cached!.conn;
 };
 
 export const disconnectDB = async () => {
@@ -36,5 +64,9 @@ export const disconnectDB = async () => {
     return;
   }
   await mongoose.disconnect();
+  if (cached) {
+    cached.conn = null;
+    cached.promise = null;
+  }
   console.log('MongoDB disconnected.');
 };

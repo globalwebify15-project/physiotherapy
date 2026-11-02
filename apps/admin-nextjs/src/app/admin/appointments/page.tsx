@@ -82,14 +82,16 @@ async function updateAppointment(formData: FormData) {
 export default async function AppointmentsPage() {
   await connectDB();
 
-  // Fetch appointments, therapists, and patients
-  const appointments = await Appointment.find()
-    .populate({ path: 'patientId', model: Patient })
-    .populate({ path: 'serviceId', model: Service })
-    .populate({ path: 'therapistId', model: Therapist })
-    .sort({ date: -1, timeSlot: -1 });
-
-  const therapists = await Therapist.find({ isActive: true });
+  // Fetch appointments, therapists, and patients concurrently
+  const [appointments, therapists] = await Promise.all([
+    Appointment.find()
+      .populate({ path: 'patientId', model: Patient })
+      .populate({ path: 'serviceId', model: Service })
+      .populate({ path: 'therapistId', model: Therapist })
+      .sort({ date: -1, timeSlot: -1 })
+      .lean(),
+    Therapist.find({ isActive: true }).sort({ name: 1 }).lean(),
+  ]);
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -197,8 +199,8 @@ export default async function AppointmentsPage() {
                       className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-teal-500 flex-1"
                     >
                       <option value="">-- Assign Therapist --</option>
-                      {therapists.map((t) => (
-                        <option key={t._id} value={t._id.toString()}>
+                      {therapists.map((t: any) => (
+                        <option key={String(t._id)} value={String(t._id)}>
                           {t.name}
                         </option>
                       ))}

@@ -40,7 +40,8 @@ export default async function ReviewsPage() {
     .populate({ path: 'patientId', model: Patient })
     .populate({ path: 'therapistId', model: Therapist })
     .populate({ path: 'serviceId', model: Service })
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
   const totalReviews = reviews.length;
   const avgRating = totalReviews > 0 

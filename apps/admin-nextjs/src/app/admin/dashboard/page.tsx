@@ -23,53 +23,77 @@ export const revalidate = 0; // Live dynamic fetch
 export default async function DashboardPage() {
   await connectDB();
 
-  // 1. Core KPIs
-  const totalPatients = await Patient.countDocuments();
-  const totalAppointments = await Appointment.countDocuments();
-  
   const todayStr = new Date().toISOString().split('T')[0];
-  const dailyAppointments = await Appointment.countDocuments({ date: todayStr });
-  
-  // Calculate total revenue from paid payments
-  const paidPayments = await Payment.find({ status: 'paid' }).lean();
-  const revenue = paidPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
 
-  const activeTherapists = await Therapist.countDocuments({ isActive: true });
-  const allTherapists = await Therapist.find({ isActive: true }).limit(2).lean();
-
-  // 2. Fetch past 7 days charts data
-  const chartsData = [];
+  // Calculate past 7 days date strings
+  const past7Days: string[] = [];
   for (let i = 6; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const dateStr = d.toISOString().split('T')[0];
-    
-    const count = await Appointment.countDocuments({ date: dateStr });
-    
-    const dayPayments = await Payment.find({
-      status: 'paid',
-      createdAt: {
-        $gte: new Date(dateStr + 'T00:00:00.000Z'),
-        $lte: new Date(dateStr + 'T23:59:59.999Z'),
-      },
-    }).lean();
-    const dayRevenue = dayPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0);
-
-    chartsData.push({
-      date: dateStr,
-      bookings: count,
-      revenue: dayRevenue,
-    });
+    past7Days.push(d.toISOString().split('T')[0]);
   }
+  const oldestDate = past7Days[0];
+  const oldestDateObj = new Date(oldestDate + 'T00:00:00.000Z');
 
-  // 3. Fetch recent appointments
-  const recentAppointments = await Appointment.find()
-    .populate({ path: 'patientId', model: Patient })
-    .populate({ path: 'serviceId', model: Service })
-    .populate({ path: 'therapistId', model: Therapist })
-    .sort({ createdAt: -1 })
-    .limit(6)
-    .lean();
+  // Execute all queries concurrently in a single parallel roundtrip
+  const [
+    totalPatients,
+    totalAppointments,
+    dailyAppointments,
+    revenueAgg,
+    activeTherapists,
+    allTherapists,
+    weeklyApptAgg,
+    weeklyRevenueAgg,
+    recentAppointments,
+  ] = await Promise.all([
+    Patient.countDocuments(),
+    Appointment.countDocuments(),
+    Appointment.countDocuments({ date: todayStr }),
+    Payment.aggregate([
+      { $match: { status: 'paid' } },
+      { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
+    ]),
+    Therapist.countDocuments({ isActive: true }),
+    Therapist.find({ isActive: true }).limit(2).lean(),
+    Appointment.aggregate([
+      { $match: { date: { $in: past7Days } } },
+      { $group: { _id: '$date', count: { $sum: 1 } } },
+    ]),
+    Payment.aggregate([
+      {
+        $match: {
+          status: 'paid',
+          createdAt: { $gte: oldestDateObj },
+        },
+      },
+      {
+        $group: {
+          _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+          revenue: { $sum: '$amount' },
+        },
+      },
+    ]),
+    Appointment.find()
+      .populate({ path: 'patientId', model: Patient })
+      .populate({ path: 'serviceId', model: Service })
+      .populate({ path: 'therapistId', model: Therapist })
+      .sort({ createdAt: -1 })
+      .limit(6)
+      .lean(),
+  ]);
+
+  const revenue = revenueAgg[0]?.total || 0;
+  const paidPaymentsCount = revenueAgg[0]?.count || 0;
+
+  const apptMap = new Map(weeklyApptAgg.map((a: any) => [a._id, a.count]));
+  const revMap = new Map(weeklyRevenueAgg.map((r: any) => [r._id, r.revenue]));
+
+  const chartsData = past7Days.map((dateStr) => ({
+    date: dateStr,
+    bookings: apptMap.get(dateStr) || 0,
+    revenue: revMap.get(dateStr) || 0,
+  }));
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -190,7 +214,7 @@ export default async function DashboardPage() {
             </span>
             <span className="text-3xl font-black text-slate-900 block">₹{revenue.toLocaleString('en-IN')}</span>
             <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-teal-800 bg-teal-100/60 px-2 py-0.5 rounded-md">
-              {paidPayments.length} Paid Invoices
+              {paidPaymentsCount} Paid Invoices
             </span>
           </div>
           <div className="w-14 h-14 rounded-2xl bg-teal-50 text-teal-800 flex items-center justify-center group-hover:scale-110 group-hover:bg-teal-700 group-hover:text-white transition-all duration-300 shadow-xs">

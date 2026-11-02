@@ -46,14 +46,18 @@ async function broadcastNotificationAction(formData: FormData) {
 export default async function NotificationsPage() {
   await connectDB();
 
-  // Fetch recent dispatched notifications populated with user / patient info
-  const notifications = await Notification.find()
-    .populate({ path: 'userId', model: User })
-    .sort({ createdAt: -1 })
-    .limit(50);
-
-  // Fetch all patients for target dropdown
-  const patients = await Patient.find().populate({ path: 'userId', model: User }).sort({ name: 1 });
+  // Concurrently fetch recent dispatched notifications and patient target list
+  const [notifications, patients] = await Promise.all([
+    Notification.find()
+      .populate({ path: 'userId', model: User })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean(),
+    Patient.find()
+      .populate({ path: 'userId', model: User })
+      .sort({ name: 1 })
+      .lean(),
+  ]);
 
   const getTypeBadge = (type: string) => {
     switch (type) {
@@ -101,8 +105,8 @@ export default async function NotificationsPage() {
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-teal-500"
               >
                 <option value="all">📢 All Registered Patients (Broadcast)</option>
-                {patients.map((p) => (
-                  <option key={p._id} value={p.userId?._id?.toString() || p.userId?.toString()}>
+                {patients.map((p: any) => (
+                  <option key={String(p._id)} value={p.userId?._id?.toString() || p.userId?.toString()}>
                     👤 {p.name} ({p.userId?.mobile || 'Patient'})
                   </option>
                 ))}

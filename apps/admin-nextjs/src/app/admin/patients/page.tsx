@@ -57,25 +57,33 @@ export default async function PatientsPage({
     ];
   }
 
-  // Fetch real patient records populated with User account
-  const patients = await Patient.find(filter)
-    .populate({ path: 'userId', model: User })
-    .sort({ createdAt: -1 });
+  // Fetch real patient records populated with User account and aggregate appointment stats concurrently
+  const [patients, apptAgg] = await Promise.all([
+    Patient.find(filter)
+      .populate({ path: 'userId', model: User })
+      .sort({ createdAt: -1 })
+      .lean(),
+    Appointment.aggregate([
+      {
+        $group: {
+          _id: '$patientId',
+          appointmentCount: { $sum: 1 },
+          lastAppointmentDate: { $max: '$date' },
+        },
+      },
+    ]),
+  ]);
 
-  // Get total appointment count for each patient
-  const patientStats = await Promise.all(
-    patients.map(async (p) => {
-      const count = await Appointment.countDocuments({ patientId: p._id });
-      const lastAppt = await Appointment.findOne({ patientId: p._id }).sort({ date: -1 });
-      return {
-        id: p._id.toString(),
-        appointmentCount: count,
-        lastAppointmentDate: lastAppt?.date || null,
-      };
-    })
+  const statsMap = new Map(
+    apptAgg.map((item: any) => [
+      item._id ? item._id.toString() : '',
+      {
+        id: item._id ? item._id.toString() : '',
+        appointmentCount: item.appointmentCount || 0,
+        lastAppointmentDate: item.lastAppointmentDate || null,
+      },
+    ])
   );
-
-  const statsMap = new Map(patientStats.map((s) => [s.id, s]));
 
   return (
     <div className="space-y-8 animate-fade-in">

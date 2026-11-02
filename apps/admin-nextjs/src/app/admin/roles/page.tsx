@@ -106,7 +106,7 @@ export default async function RolesPage({
   // Fetch all staff users (exclude patient accounts)
   const staffUsers = await User.find({
     role: { $in: ['superadmin', 'admin', 'receptionist', 'therapist'] },
-  }).sort({ createdAt: -1 });
+  }).sort({ createdAt: -1 }).lean();
 
   const PERMISSION_MATRIX = [
     { module: 'Dashboard & Financial Analytics', superadmin: true, admin: true, receptionist: false, therapist: false },
@@ -256,11 +256,11 @@ export default async function RolesPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {staffUsers.map((u) => (
-                  <tr key={u._id.toString()} className="hover:bg-slate-50/70 transition-colors">
+                {staffUsers.map((u: any) => (
+                  <tr key={String(u._id)} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 pl-2 font-semibold text-slate-800">
                       <div>{u.email || 'No email specified'}</div>
-                      <div className="text-[10px] text-slate-400 font-normal">ID: {u._id.toString().slice(-6)}</div>
+                      <div className="text-[10px] text-slate-400 font-normal">ID: {String(u._id).slice(-6)}</div>
                     </td>
                     <td className="py-3 font-medium text-slate-600">{u.mobile}</td>
                     <td className="py-3">
@@ -289,7 +289,7 @@ export default async function RolesPage({
                     </td>
                     <td className="py-3 pr-2 text-right">
                       <form action={updateStaffAction} className="inline-block">
-                        <input type="hidden" name="userId" value={u._id.toString()} />
+                        <input type="hidden" name="userId" value={String(u._id)} />
                         <input type="hidden" name="actionType" value="toggle_status" />
                         <button
                           type="submit"

@@ -24,18 +24,60 @@ export default async function ReportsPage({
   const resolvedParams = searchParams ? await searchParams : {};
   const currentType = resolvedParams?.type || 'revenue';
 
-  // 1. Revenue Report Data
-  const payments = await Payment.find({ status: 'paid' })
-    .populate({
-      path: 'appointmentId',
-      model: Appointment,
-      populate: [
-        { path: 'patientId', model: Patient },
-        { path: 'serviceId', model: Service },
-      ],
-    })
-    .sort({ createdAt: -1 });
+  // Concurrently fetch all report streams using optimized aggregation and lean queries
+  const [
+    payments,
+    appointments,
+    therapists,
+    therapistApptAgg,
+    patients,
+    patientApptAgg
+  ] = await Promise.all([
+    Payment.find({ status: 'paid' })
+      .populate({
+        path: 'appointmentId',
+        model: Appointment,
+        populate: [
+          { path: 'patientId', model: Patient },
+          { path: 'serviceId', model: Service },
+        ],
+      })
+      .sort({ createdAt: -1 })
+      .lean(),
+    Appointment.find()
+      .populate({ path: 'patientId', model: Patient })
+      .populate({ path: 'serviceId', model: Service })
+      .populate({ path: 'therapistId', model: Therapist })
+      .sort({ date: -1, timeSlot: -1 })
+      .lean(),
+    Therapist.find().sort({ name: 1 }).lean(),
+    Appointment.aggregate([
+      {
+        $group: {
+          _id: '$therapistId',
+          totalBookings: { $sum: 1 },
+          completedSessions: {
+            $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] },
+          },
+        },
+      },
+    ]),
+    Patient.find()
+      .populate({ path: 'userId', model: User })
+      .sort({ createdAt: -1 })
+      .lean(),
+    Appointment.aggregate([
+      {
+        $group: {
+          _id: '$patientId',
+          apptCount: { $sum: 1 },
+          lastVisitDate: { $max: '$date' },
+        },
+      },
+    ]),
+  ]);
 
+  // 1. Revenue Report Data
   const revenueRows = payments.map((p: any) => {
     const appt = p.appointmentId;
     return {
@@ -45,18 +87,12 @@ export default async function ReportsPage({
       'Treatment Service': appt?.serviceId?.title || 'General Therapy',
       'Visit Type': appt?.visitType || 'clinic',
       'Amount (INR)': p.amount,
-      'Payment Date': new Date(p.createdAt).toISOString().split('T')[0],
+      'Payment Date': p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : 'N/A',
       'Status': p.status,
     };
   });
 
   // 2. Appointment Report Data
-  const appointments = await Appointment.find()
-    .populate({ path: 'patientId', model: Patient })
-    .populate({ path: 'serviceId', model: Service })
-    .populate({ path: 'therapistId', model: Therapist })
-    .sort({ date: -1, timeSlot: -1 });
-
   const appointmentRows = appointments.map((a: any) => ({
     'Appointment ID': a._id.toString(),
     'Patient Name': a.patientId?.name || 'Unknown',
@@ -70,47 +106,50 @@ export default async function ReportsPage({
   }));
 
   // 3. Therapist Performance Data
-  const therapists = await Therapist.find().sort({ name: 1 });
-  const therapistRows = await Promise.all(
-    therapists.map(async (t: any) => {
-      const totalBookings = await Appointment.countDocuments({ therapistId: t._id });
-      const completed = await Appointment.countDocuments({ therapistId: t._id, status: 'completed' });
-      return {
-        'Therapist Name': t.name,
-        'Email': t.email,
-        'Mobile': t.mobile,
-        'Specialization': (t.specialization || []).join(', '),
-        'Experience (Years)': t.experience,
-        'Avg Rating': t.ratingAverage,
-        'Total Bookings': totalBookings,
-        'Completed Sessions': completed,
-      };
-    })
+  const thMap = new Map(
+    therapistApptAgg.map((item: any) => [
+      item._id ? item._id.toString() : '',
+      { totalBookings: item.totalBookings || 0, completedSessions: item.completedSessions || 0 },
+    ])
   );
+
+  const therapistRows = therapists.map((t: any) => {
+    const stats = thMap.get(t._id.toString()) || { totalBookings: 0, completedSessions: 0 };
+    return {
+      'Therapist Name': t.name,
+      'Email': t.email,
+      'Mobile': t.mobile,
+      'Specialization': (t.specialization || []).join(', '),
+      'Experience (Years)': t.experience,
+      'Avg Rating': t.ratingAverage,
+      'Total Bookings': stats.totalBookings,
+      'Completed Sessions': stats.completedSessions,
+    };
+  });
 
   // 4. Patient Registry Report Data
-  const patients = await Patient.find()
-    .populate({ path: 'userId', model: User })
-    .sort({ createdAt: -1 });
-
-  const patientRows = await Promise.all(
-    patients.map(async (p: any) => {
-      const apptCount = await Appointment.countDocuments({ patientId: p._id });
-      const lastAppt = await Appointment.findOne({ patientId: p._id }).sort({ date: -1 });
-      return {
-        'Patient ID': p._id.toString().slice(-6),
-        'Full Name': p.name,
-        'Mobile Number': p.userId?.mobile || 'N/A',
-        'Gender': p.gender || 'Not specified',
-        'Date of Birth': p.dob ? new Date(p.dob).toISOString().split('T')[0] : 'N/A',
-        'Emergency Contact': p.emergencyContact?.phone ? `${p.emergencyContact.name} (${p.emergencyContact.phone})` : 'N/A',
-        'Medical Conditions': (p.medicalHistory || []).join('; ') || 'None reported',
-        'Total Bookings': apptCount,
-        'Last Visit Date': lastAppt?.date || 'None',
-        'Registered On': p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : 'N/A',
-      };
-    })
+  const ptMap = new Map(
+    patientApptAgg.map((item: any) => [
+      item._id ? item._id.toString() : '',
+      { apptCount: item.apptCount || 0, lastVisitDate: item.lastVisitDate || 'None' },
+    ])
   );
+
+  const patientRows = patients.map((p: any) => {
+    const stats = ptMap.get(p._id.toString()) || { apptCount: 0, lastVisitDate: 'None' };
+    return {
+      'Patient ID': p._id.toString().slice(-6),
+      'Full Name': p.name,
+      'Mobile Number': p.userId?.mobile || 'N/A',
+      'Gender': p.gender || 'Not specified',
+      'Date of Birth': p.dob ? new Date(p.dob).toISOString().split('T')[0] : 'N/A',
+      'Emergency Contact': p.emergencyContact?.phone ? `${p.emergencyContact.name} (${p.emergencyContact.phone})` : 'N/A',
+      'Medical Conditions': (p.medicalHistory || []).join('; ') || 'None reported',
+      'Total Bookings': stats.apptCount,
+      'Last Visit Date': stats.lastVisitDate,
+      'Registered On': p.createdAt ? new Date(p.createdAt).toISOString().split('T')[0] : 'N/A',
+    };
+  });
 
   // Active data selection
   let activeData: any[] = [];

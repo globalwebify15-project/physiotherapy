@@ -142,6 +142,7 @@ export default function AdminLayoutClient({
               <Link
                 key={item.name}
                 href={item.href}
+                prefetch={true}
                 className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-semibold text-xs transition-all duration-200 ${
                   isActive
                     ? 'bg-gradient-to-r from-teal-50 to-emerald-50 text-teal-800 font-bold border-l-4 border-teal-600 shadow-sm shadow-teal-600/10'
