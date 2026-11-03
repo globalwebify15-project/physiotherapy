@@ -1,6 +1,7 @@
 import React from 'react';
 import { connectDB, Therapist } from 'database';
 import { revalidatePath } from 'next/cache';
+import ViewSwitcher from '@/components/ViewSwitcher';
 import { 
   UserRound, 
   Mail, 
@@ -244,107 +245,219 @@ export default async function TherapistsPage() {
           </form>
         </div>
 
-        {/* Right 2 Columns: Therapists List */}
-        <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {therapists.length === 0 ? (
-            <div className="col-span-2 bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-              <UserRound className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-              <h3 className="font-bold text-slate-800 text-lg">No active practitioners</h3>
-              <p className="text-slate-400 text-sm mt-1">Add details on the left form to onboard new therapists.</p>
-            </div>
-          ) : (
-            therapists.map((therapist: any) => (
-              <div 
-                key={therapist._id.toString()} 
-                className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
-              >
-                <div className="space-y-4">
-                  {/* Avatar and rating header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {therapist.profilePhoto ? (
-                        <img
-                          src={therapist.profilePhoto}
-                          alt={therapist.name}
-                          className="w-12 h-12 rounded-full object-cover object-top border-2 border-teal-500/20 shadow-xs"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-base border border-teal-100">
-                          {therapist.name.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <h4 className="font-bold text-slate-800 text-base leading-snug">{therapist.name}</h4>
-                        <span className="text-xs font-semibold text-slate-400">Experience: {therapist.experience} years</span>
-                      </div>
-                    </div>
-                    <div className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg border border-amber-200/30 flex items-center gap-1 text-xs font-bold shrink-0">
-                      <Star size={12} fill="currentColor" />
-                      {therapist.ratingAverage}
-                    </div>
-                  </div>
-
-                  {/* Body stats lists */}
-                  <div className="space-y-2.5 text-sm font-medium text-slate-500">
-                    <div className="flex items-center gap-2">
-                      <GraduationCap size={16} className="text-slate-400" />
-                      <span className="text-xs text-slate-600 truncate block">{therapist.qualification}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Mail size={16} className="text-slate-400" />
-                      <span className="text-xs">{therapist.email}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Phone size={16} className="text-slate-400" />
-                      <span className="text-xs">{therapist.mobile}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CalendarDays size={16} className="text-slate-400" />
-                      <span className="text-xs">
-                        Hrs: {therapist.workingHours?.start || '09:00'} - {therapist.workingHours?.end || '19:00'}
-                      </span>
-                    </div>
+        {/* Right 2 Columns: Therapists View Switcher (Table default / Cards toggle) */}
+        <div className="xl:col-span-2 space-y-4">
+          <ViewSwitcher
+            label="Therapists & Doctors"
+            totalCount={therapists.length}
+            defaultView="table"
+            tableView={
+              therapists.length === 0 ? (
+                <div className="bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
+                  <UserRound className="mx-auto text-slate-300 w-12 h-12 mb-4" />
+                  <h3 className="font-bold text-slate-800 text-lg">No active practitioners</h3>
+                  <p className="text-slate-400 text-sm mt-1">Add details on the left form to onboard new therapists.</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="py-3.5 px-4">Practitioner</th>
+                          <th className="py-3.5 px-4">Experience</th>
+                          <th className="py-3.5 px-4">Rating</th>
+                          <th className="py-3.5 px-4">Contact</th>
+                          <th className="py-3.5 px-4">Hours</th>
+                          <th className="py-3.5 px-4">Specialization</th>
+                          <th className="py-3.5 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        {therapists.map((therapist: any) => (
+                          <tr key={therapist._id.toString()} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-3">
+                                {therapist.profilePhoto ? (
+                                  <img
+                                    src={therapist.profilePhoto}
+                                    alt={therapist.name}
+                                    className="w-10 h-10 rounded-full object-cover object-top border border-teal-500/20 shadow-2xs shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-sm border border-teal-100 shrink-0">
+                                    {therapist.name.charAt(0)}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-bold text-slate-900 text-sm">{therapist.name}</div>
+                                  <div className="text-[11px] text-slate-400 truncate max-w-[170px]" title={therapist.qualification}>
+                                    {therapist.qualification}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-slate-800">{therapist.experience} yrs</span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/50 px-2 py-0.5 rounded-md text-[11px] font-bold">
+                                <Star size={11} fill="currentColor" className="text-amber-500" />
+                                {therapist.ratingAverage || 5}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="text-slate-800 font-medium">{therapist.mobile}</div>
+                              <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{therapist.email}</div>
+                            </td>
+                            <td className="py-3 px-4 text-[11px] text-slate-600">
+                              {therapist.workingHours?.start || '09:00'} - {therapist.workingHours?.end || '19:00'}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1 flex-wrap max-w-[200px]">
+                                {therapist.specialization && therapist.specialization.slice(0, 2).map((spec: string, idx: number) => (
+                                  <span key={idx} className="text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded">
+                                    {spec}
+                                  </span>
+                                ))}
+                                {therapist.specialization && therapist.specialization.length > 2 && (
+                                  <span className="text-[9px] text-slate-400 font-bold">+{therapist.specialization.length - 2}</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <EditTherapistModal
+                                therapist={{
+                                  _id: therapist._id.toString(),
+                                  name: String(therapist.name),
+                                  email: String(therapist.email),
+                                  mobile: String(therapist.mobile),
+                                  qualification: String(therapist.qualification),
+                                  experience: Number(therapist.experience),
+                                  specialization: therapist.specialization ? Array.from(therapist.specialization).map(String) : [],
+                                  workingHours: {
+                                    start: String(therapist.workingHours?.start || '09:00'),
+                                    end: String(therapist.workingHours?.end || '19:00'),
+                                  },
+                                  ratingAverage: Number(therapist.ratingAverage || 5),
+                                  profilePhoto: therapist.profilePhoto ? String(therapist.profilePhoto) : undefined,
+                                }}
+                                onUpdate={updateTherapistAction}
+                                onDelete={deleteTherapistAction}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
+              )
+            }
+            cardView={
+              therapists.length === 0 ? (
+                <div className="col-span-2 bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
+                  <UserRound className="mx-auto text-slate-300 w-12 h-12 mb-4" />
+                  <h3 className="font-bold text-slate-800 text-lg">No active practitioners</h3>
+                  <p className="text-slate-400 text-sm mt-1">Add details on the left form to onboard new therapists.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {therapists.map((therapist: any) => (
+                    <div 
+                      key={therapist._id.toString()} 
+                      className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+                    >
+                      <div className="space-y-4">
+                        {/* Avatar and rating header */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {therapist.profilePhoto ? (
+                              <img
+                                src={therapist.profilePhoto}
+                                alt={therapist.name}
+                                className="w-12 h-12 rounded-full object-cover object-top border-2 border-teal-500/20 shadow-xs"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-base border border-teal-100">
+                                {therapist.name.charAt(0)}
+                              </div>
+                            )}
+                            <div>
+                              <h4 className="font-bold text-slate-800 text-base leading-snug">{therapist.name}</h4>
+                              <span className="text-xs font-semibold text-slate-400">Experience: {therapist.experience} years</span>
+                            </div>
+                          </div>
+                          <div className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg border border-amber-200/30 flex items-center gap-1 text-xs font-bold shrink-0">
+                            <Star size={12} fill="currentColor" />
+                            {therapist.ratingAverage}
+                          </div>
+                        </div>
 
-                {/* Specialties footer labels */}
-                {therapist.specialization && therapist.specialization.length > 0 && (
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5">
-                    {therapist.specialization.map((spec: string, idx: number) => (
-                      <span 
-                        key={idx} 
-                        className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2 py-0.5 rounded-md"
-                      >
-                        {spec}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                        {/* Body stats lists */}
+                        <div className="space-y-2.5 text-sm font-medium text-slate-500">
+                          <div className="flex items-center gap-2">
+                            <GraduationCap size={16} className="text-slate-400" />
+                            <span className="text-xs text-slate-600 truncate block">{therapist.qualification}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Mail size={16} className="text-slate-400" />
+                            <span className="text-xs">{therapist.email}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Phone size={16} className="text-slate-400" />
+                            <span className="text-xs">{therapist.mobile}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <CalendarDays size={16} className="text-slate-400" />
+                            <span className="text-xs">
+                              Hrs: {therapist.workingHours?.start || '09:00'} - {therapist.workingHours?.end || '19:00'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
 
-                {/* Edit & Delete Action Buttons */}
-                <EditTherapistModal
-                  therapist={{
-                    _id: therapist._id.toString(),
-                    name: String(therapist.name),
-                    email: String(therapist.email),
-                    mobile: String(therapist.mobile),
-                    qualification: String(therapist.qualification),
-                    experience: Number(therapist.experience),
-                    specialization: therapist.specialization ? Array.from(therapist.specialization).map(String) : [],
-                    workingHours: {
-                      start: String(therapist.workingHours?.start || '09:00'),
-                      end: String(therapist.workingHours?.end || '19:00'),
-                    },
-                    ratingAverage: Number(therapist.ratingAverage || 5),
-                    profilePhoto: therapist.profilePhoto ? String(therapist.profilePhoto) : undefined,
-                  }}
-                  onUpdate={updateTherapistAction}
-                  onDelete={deleteTherapistAction}
-                />
+                      {/* Specialties footer labels */}
+                      {therapist.specialization && therapist.specialization.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5">
+                          {therapist.specialization.map((spec: string, idx: number) => (
+                            <span 
+                              key={idx} 
+                              className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2 py-0.5 rounded-md"
+                            >
+                              {spec}
+                            </span>
+                          ))}
+                        </div>
+                      )}
 
-              </div>
-            ))
-          )}
+                      {/* Edit & Delete Action Buttons */}
+                      <EditTherapistModal
+                        therapist={{
+                          _id: therapist._id.toString(),
+                          name: String(therapist.name),
+                          email: String(therapist.email),
+                          mobile: String(therapist.mobile),
+                          qualification: String(therapist.qualification),
+                          experience: Number(therapist.experience),
+                          specialization: therapist.specialization ? Array.from(therapist.specialization).map(String) : [],
+                          workingHours: {
+                            start: String(therapist.workingHours?.start || '09:00'),
+                            end: String(therapist.workingHours?.end || '19:00'),
+                          },
+                          ratingAverage: Number(therapist.ratingAverage || 5),
+                          profilePhoto: therapist.profilePhoto ? String(therapist.profilePhoto) : undefined,
+                        }}
+                        onUpdate={updateTherapistAction}
+                        onDelete={deleteTherapistAction}
+                      />
+
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+          />
         </div>
 
       </div>

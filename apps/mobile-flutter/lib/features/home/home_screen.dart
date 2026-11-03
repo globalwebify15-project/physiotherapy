@@ -927,31 +927,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           const SizedBox(height: 24),
 
-                          // Quick Action Shortcuts
+                          // Quick Action Shortcuts (Book Visit, Contact Us, About Clinic, Offers)
                           Row(
                             children: [
                               Expanded(
                                 child: _buildActionShortcut(
                                   icon: Icons.calendar_month_rounded,
-                                  title: 'Book Session',
+                                  title: 'Book Visit',
                                   color: const Color(0xFF2563EB),
                                   onTap: () => context.push('/booking'),
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: _buildActionShortcut(
-                                  icon: Icons.phone_in_talk_rounded,
-                                  title: 'Call Doctor',
+                                  icon: Icons.headset_mic_rounded,
+                                  title: 'Contact Us',
                                   color: const Color(0xFF0F766E),
-                                  onTap: () => PhoneHelper.showDoctorCallModal(context),
+                                  onTap: () => context.push('/contact_us'),
                                 ),
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _buildActionShortcut(
+                                  icon: Icons.local_hospital_rounded,
+                                  title: 'About Clinic',
+                                  color: const Color(0xFF0284C7),
+                                  onTap: () => context.push('/about_clinic'),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: _buildActionShortcut(
                                   icon: Icons.percent_rounded,
-                                  title: 'View Offers',
+                                  title: 'Offers',
                                   color: const Color(0xFFD97706),
                                   onTap: () => context.push('/offers'),
                                 ),

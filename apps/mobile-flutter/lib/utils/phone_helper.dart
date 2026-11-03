@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'app_storage.dart';
 
 class PhoneHelper {
   // Live Active Contact & Helpline details for QuickPhysio24
@@ -21,8 +23,29 @@ class PhoneHelper {
   static String certifications = "MIAP Certified, JSCPT Registered, Government Recognized Center";
   static String missionStatement = "Delivering compassionate, evidence-based physiotherapy to restore painless mobility and independent living for every patient.";
 
+  /// Loads cached CMS data from AppStorage immediately on startup
+  static Future<void> loadFromStorage() async {
+    try {
+      final storage = AppStorage.instance;
+      final contactRaw = await storage.read(key: 'cms_contact_details');
+      if (contactRaw != null && contactRaw.isNotEmpty) {
+        final map = jsonDecode(contactRaw);
+        if (map is Map) {
+          updateFromCms(Map<String, dynamic>.from(map), persist: false);
+        }
+      }
+      final aboutRaw = await storage.read(key: 'cms_about_clinic');
+      if (aboutRaw != null && aboutRaw.isNotEmpty) {
+        final map = jsonDecode(aboutRaw);
+        if (map is Map) {
+          updateAboutFromCms(Map<String, dynamic>.from(map), persist: false);
+        }
+      }
+    } catch (_) {}
+  }
+
   /// Updates contact and helpline details dynamically from Admin CMS
-  static void updateFromCms(Map<String, dynamic> cms) {
+  static void updateFromCms(Map<String, dynamic> cms, {bool persist = true}) {
     if (cms['phone'] != null && cms['phone'].toString().trim().isNotEmpty) {
       helplinePhone = cms['phone'].toString().trim();
     }
@@ -48,10 +71,13 @@ class PhoneHelper {
     if (cms['workingHours'] != null && cms['workingHours'].toString().trim().isNotEmpty) {
       workingHours = cms['workingHours'].toString().trim();
     }
+    if (persist) {
+      AppStorage.instance.write(key: 'cms_contact_details', value: jsonEncode(cms)).catchError((_) => null);
+    }
   }
 
   /// Updates about clinic information dynamically from Admin CMS
-  static void updateAboutFromCms(Map<String, dynamic> cms) {
+  static void updateAboutFromCms(Map<String, dynamic> cms, {bool persist = true}) {
     if (cms['clinicHeadline'] != null && cms['clinicHeadline'].toString().trim().isNotEmpty) {
       clinicHeadline = cms['clinicHeadline'].toString().trim();
     }
@@ -69,6 +95,9 @@ class PhoneHelper {
     }
     if (cms['missionStatement'] != null && cms['missionStatement'].toString().trim().isNotEmpty) {
       missionStatement = cms['missionStatement'].toString().trim();
+    }
+    if (persist) {
+      AppStorage.instance.write(key: 'cms_about_clinic', value: jsonEncode(cms)).catchError((_) => null);
     }
   }
 

@@ -115,7 +115,7 @@ class _AboutClinicScreenState extends State<AboutClinicScreen> {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                'Ashok Nagar, Ranchi, Jharkhand',
+                                PhoneHelper.physicalAddress,
                                 style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13, fontWeight: FontWeight.w500),
                               ),
                             ),

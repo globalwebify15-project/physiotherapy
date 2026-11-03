@@ -1,6 +1,7 @@
 import React from 'react';
 import { connectDB, Service } from 'database';
 import { revalidatePath } from 'next/cache';
+import ViewSwitcher from '@/components/ViewSwitcher';
 import { 
   Activity, 
   Plus, 
@@ -218,70 +219,169 @@ export default async function ServicesPage() {
           </form>
         </div>
 
-        {/* Right 2 Columns: Services Grid */}
-        <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {services.length === 0 ? (
-            <div className="col-span-2 bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-              <Activity className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-              <h3 className="font-bold text-slate-800 text-lg">No active services</h3>
-              <p className="text-slate-400 text-sm mt-1">Configure treatments using the left panel.</p>
-            </div>
-          ) : (
-            services.map((service: any) => (
-              <div 
-                key={service._id.toString()} 
-                className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
-                      {service.category}
-                    </span>
-                    <div className="flex items-center gap-1 text-slate-400 text-xs font-semibold">
-                      <Clock size={12} />
-                      {service.duration} mins
-                    </div>
-                  </div>
-
-                  <h3 className="font-bold text-slate-800 text-base leading-snug">{service.title}</h3>
-                  <p className="text-xs text-slate-400 leading-relaxed line-clamp-3 font-medium">{service.description}</p>
+        {/* Right 2 Columns: Services View Switcher (Table default / Cards toggle) */}
+        <div className="xl:col-span-2 space-y-4">
+          <ViewSwitcher
+            label="Services Catalog"
+            totalCount={services.length}
+            defaultView="table"
+            tableView={
+              services.length === 0 ? (
+                <div className="bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
+                  <Activity className="mx-auto text-slate-300 w-12 h-12 mb-4" />
+                  <h3 className="font-bold text-slate-800 text-lg">No active services</h3>
+                  <p className="text-slate-400 text-sm mt-1">Configure treatments using the left panel.</p>
                 </div>
-
-                <div>
-                  <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
-                      <div className="flex items-center gap-1.5">
-                        <Building size={14} className={service.clinicVisitAvailable ? 'text-teal-600' : 'text-slate-300'} />
-                        <span>Clinic: {service.clinicVisitAvailable ? `₹${service.pricingClinic}` : 'N/A'}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <MapPin size={14} className={service.homeVisitAvailable ? 'text-emerald-600' : 'text-slate-300'} />
-                        <span>Home: {service.homeVisitAvailable ? `₹${service.pricingHome}` : 'N/A'}</span>
-                      </div>
-                    </div>
+              ) : (
+                <div className="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="py-3.5 px-4">Service & Category</th>
+                          <th className="py-3.5 px-4">Duration</th>
+                          <th className="py-3.5 px-4">Clinic Rate</th>
+                          <th className="py-3.5 px-4">Home Rate</th>
+                          <th className="py-3.5 px-4">Offerings</th>
+                          <th className="py-3.5 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+                        {services.map((service: any) => (
+                          <tr key={service._id.toString()} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="font-bold text-slate-900 text-sm">{service.title}</div>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-md">
+                                  {service.category}
+                                </span>
+                                <span className="text-[10px] text-slate-400 line-clamp-1 max-w-[200px]" title={service.description}>
+                                  {service.description}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="inline-flex items-center gap-1 font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-md text-[11px]">
+                                <Clock size={11} className="text-slate-400" />
+                                {service.duration} mins
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-slate-900">
+                                {service.clinicVisitAvailable ? `₹${service.pricingClinic}` : <span className="text-slate-300">N/A</span>}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <span className="font-bold text-slate-900">
+                                {service.homeVisitAvailable ? `₹${service.pricingHome}` : <span className="text-slate-300">N/A</span>}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {service.clinicVisitAvailable && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded">
+                                    <Building size={10} /> Clinic
+                                  </span>
+                                )}
+                                {service.homeVisitAvailable && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded">
+                                    <MapPin size={10} /> Home
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <EditServiceModal
+                                service={{
+                                  _id: service._id.toString(),
+                                  title: String(service.title),
+                                  description: String(service.description),
+                                  category: String(service.category),
+                                  duration: Number(service.duration),
+                                  pricingClinic: Number(service.pricingClinic),
+                                  pricingHome: Number(service.pricingHome),
+                                  homeVisitAvailable: Boolean(service.homeVisitAvailable),
+                                  clinicVisitAvailable: Boolean(service.clinicVisitAvailable),
+                                }}
+                                onUpdate={updateServiceAction}
+                                onDelete={deleteServiceAction}
+                              />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-
-                  {/* Edit & Delete Action Buttons */}
-                  <EditServiceModal
-                    service={{
-                      _id: service._id.toString(),
-                      title: String(service.title),
-                      description: String(service.description),
-                      category: String(service.category),
-                      duration: Number(service.duration),
-                      pricingClinic: Number(service.pricingClinic),
-                      pricingHome: Number(service.pricingHome),
-                      homeVisitAvailable: Boolean(service.homeVisitAvailable),
-                      clinicVisitAvailable: Boolean(service.clinicVisitAvailable),
-                    }}
-                    onUpdate={updateServiceAction}
-                    onDelete={deleteServiceAction}
-                  />
                 </div>
+              )
+            }
+            cardView={
+              services.length === 0 ? (
+                <div className="col-span-2 bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
+                  <Activity className="mx-auto text-slate-300 w-12 h-12 mb-4" />
+                  <h3 className="font-bold text-slate-800 text-lg">No active services</h3>
+                  <p className="text-slate-400 text-sm mt-1">Configure treatments using the left panel.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {services.map((service: any) => (
+                    <div 
+                      key={service._id.toString()} 
+                      className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2.5 py-0.5 rounded-md uppercase tracking-wider">
+                            {service.category}
+                          </span>
+                          <div className="flex items-center gap-1 text-slate-400 text-xs font-semibold">
+                            <Clock size={12} />
+                            {service.duration} mins
+                          </div>
+                        </div>
 
-              </div>
-            ))
-          )}
+                        <h3 className="font-bold text-slate-800 text-base leading-snug">{service.title}</h3>
+                        <p className="text-xs text-slate-400 leading-relaxed line-clamp-3 font-medium">{service.description}</p>
+                      </div>
+
+                      <div>
+                        <div className="mt-6 pt-4 border-t border-slate-100 space-y-3">
+                          <div className="flex items-center justify-between text-xs font-semibold text-slate-400">
+                            <div className="flex items-center gap-1.5">
+                              <Building size={14} className={service.clinicVisitAvailable ? 'text-teal-600' : 'text-slate-300'} />
+                              <span>Clinic: {service.clinicVisitAvailable ? `₹${service.pricingClinic}` : 'N/A'}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <MapPin size={14} className={service.homeVisitAvailable ? 'text-emerald-600' : 'text-slate-300'} />
+                              <span>Home: {service.homeVisitAvailable ? `₹${service.pricingHome}` : 'N/A'}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Edit & Delete Action Buttons */}
+                        <EditServiceModal
+                          service={{
+                            _id: service._id.toString(),
+                            title: String(service.title),
+                            description: String(service.description),
+                            category: String(service.category),
+                            duration: Number(service.duration),
+                            pricingClinic: Number(service.pricingClinic),
+                            pricingHome: Number(service.pricingHome),
+                            homeVisitAvailable: Boolean(service.homeVisitAvailable),
+                            clinicVisitAvailable: Boolean(service.clinicVisitAvailable),
+                          }}
+                          onUpdate={updateServiceAction}
+                          onDelete={deleteServiceAction}
+                        />
+                      </div>
+
+                    </div>
+                  ))}
+                </div>
+              )
+            }
+          />
         </div>
 
       </div>

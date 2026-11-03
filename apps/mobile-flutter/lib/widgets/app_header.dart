@@ -118,6 +118,19 @@ class AppHeader extends StatelessWidget {
           ),
         ),
 
+        // Contact & Help Desk
+        IconButton(
+          onPressed: () => context.push('/contact_us'),
+          icon: const Icon(
+            Icons.headset_mic_rounded,
+            color: Color(0xFF5EEAD4),
+            size: 22,
+          ),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+          tooltip: 'Clinic Contact & Help',
+        ),
+
         // Search Icon
         IconButton(
           onPressed: onSearchTap ?? () => context.push('/all_services'),

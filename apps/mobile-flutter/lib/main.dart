@@ -19,6 +19,7 @@ import 'features/settings/theme_provider.dart';
 import 'features/auth/register_screen.dart';
 import 'services/notification_service.dart';
 import 'utils/app_storage.dart';
+import 'utils/phone_helper.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -30,6 +31,9 @@ void main() async {
   } catch (e) {
     debugPrint('[NOTIFICATION INIT] Initialized with fallback: $e');
   }
+
+  // Pre-load CMS About and Contact settings from storage
+  await PhoneHelper.loadFromStorage();
 
   // Persistent Login Session Check (Persists until manual logout or app uninstall)
   String initialRoute = '/';
