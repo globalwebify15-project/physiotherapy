@@ -150,6 +150,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final response = await _apiService.get('/patients');
       if (response.statusCode == 200 && response.data['patient'] != null) {
         final patient = response.data['patient'];
+        final pName = (patient['name'] ?? '').toString().trim();
+        final bool hasCompletedProfile = pName.isNotEmpty &&
+            !pName.startsWith('Patient (') &&
+            pName.toLowerCase() != 'patient';
+
+        // If patient already has a valid profile in database and user is not in manual edit mode, restore & redirect to home!
+        if (!widget.isEditing && hasCompletedProfile) {
+          await _storage.write(key: 'patientName', value: pName);
+          if (storedMobile.isNotEmpty) {
+            await _storage.write(key: 'patientName_$storedMobile', value: pName);
+          }
+          final pAddr = patient['address']?.toString() ??
+              (patient['savedAddresses'] is List && (patient['savedAddresses'] as List).isNotEmpty
+                  ? (patient['savedAddresses'][0] is Map
+                      ? patient['savedAddresses'][0]['addressLine']?.toString() ?? ''
+                      : patient['savedAddresses'][0].toString())
+                  : '');
+          if (pAddr.isNotEmpty) {
+            await _storage.write(key: 'patientAddress', value: pAddr);
+            if (storedMobile.isNotEmpty) {
+              await _storage.write(key: 'patientAddress_$storedMobile', value: pAddr);
+            }
+          }
+          if (mounted) {
+            context.go('/home');
+            return;
+          }
+        }
+
         setState(() {
           _nameController.text = patient['name'] ?? '';
           _mobileController.text = patient['userId'] is Map ? (patient['userId']['mobile'] ?? '') : storedMobile;
@@ -174,7 +203,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           if (patient['savedAddresses'] != null) {
             _addressControllers.clear();
             for (var addr in patient['savedAddresses']) {
-              _addressControllers.add(TextEditingController(text: addr));
+              final line = addr is Map ? (addr['addressLine']?.toString() ?? '') : addr.toString();
+              if (line.isNotEmpty) {
+                _addressControllers.add(TextEditingController(text: line));
+              }
             }
           }
         });

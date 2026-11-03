@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, User, Patient } from 'database';
 import { signAccessToken, signRefreshToken } from '@/utils/auth';
-import { getApps } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,13 +9,15 @@ export async function POST(request: NextRequest) {
 
     let targetMobile = inputMobile;
 
-    // If a Firebase Auth idToken is provided, verify it to extract the authenticated phone number
+    // If a Firebase Auth idToken is provided, safely verify it to extract the authenticated phone number
     if (idToken) {
       try {
+        const { getApps } = await import('firebase-admin/app');
+        const { getAuth } = await import('firebase-admin/auth');
         const apps = getApps();
-        if (apps.length > 0) {
-          const decoded = await getAuth(apps[0]!).verifyIdToken(idToken);
-          if (decoded.phone_number) {
+        if (apps.length > 0 && apps[0]) {
+          const decoded = await getAuth(apps[0]).verifyIdToken(idToken);
+          if (decoded && decoded.phone_number) {
             targetMobile = decoded.phone_number.replace(/^\+91/, '');
           }
         }
@@ -124,6 +124,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error verifying OTP:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

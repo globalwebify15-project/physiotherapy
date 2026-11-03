@@ -20,8 +20,18 @@ export async function GET(request: NextRequest) {
       if (dbUser) targetUserId = dbUser._id;
     }
 
-    if (user?.role === 'patient' || targetUserId) {
-      const patient = await Patient.findOne({ userId: targetUserId }).populate('userId');
+    if (user?.role === 'patient' || targetUserId || mobileParam) {
+      let patient = targetUserId ? await Patient.findOne({ userId: targetUserId }).populate('userId') : null;
+      if (!patient && mobileParam) {
+        const clean = mobileParam.replace(/^\+91/, '').trim();
+        patient = await Patient.findOne({
+          $or: [
+            { 'emergencyContact.phone': clean },
+            { 'emergencyContact.phone': `+91${clean}` },
+            { savedAddresses: { $elemMatch: { phone: clean } } },
+          ]
+        }).populate('userId');
+      }
       if (!patient) {
         return NextResponse.json({ error: 'Patient profile not found' }, { status: 404 });
       }

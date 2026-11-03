@@ -54,10 +54,41 @@ class _LoginScreenState extends State<LoginScreen> {
               final data = response.data;
               await AppStorage.write(key: 'accessToken', value: data['accessToken']);
               await AppStorage.write(key: 'refreshToken', value: data['refreshToken']);
-              await AppStorage.write(key: 'patientId', value: data['patient']?['id'] ?? 'patient_$mobile');
               await AppStorage.write(key: 'userMobile', value: mobile);
 
-              if (data['isNewUser'] == true) {
+              final patientData = data['patient'];
+              if (patientData is Map) {
+                final pId = patientData['id']?.toString() ?? patientData['_id']?.toString();
+                if (pId != null) await AppStorage.write(key: 'patientId', value: pId);
+
+                final pName = patientData['name']?.toString() ?? '';
+                final pAddr = patientData['address']?.toString() ??
+                    (patientData['savedAddresses'] is List && (patientData['savedAddresses'] as List).isNotEmpty
+                        ? (patientData['savedAddresses'][0] is Map
+                            ? patientData['savedAddresses'][0]['addressLine']?.toString() ?? ''
+                            : patientData['savedAddresses'][0].toString())
+                        : '');
+                final pGender = patientData['gender']?.toString() ?? '';
+                final pDob = patientData['dob']?.toString() ?? '';
+
+                if (pName.isNotEmpty && !pName.startsWith('Patient (')) {
+                  await AppStorage.write(key: 'patientName', value: pName);
+                  await AppStorage.write(key: 'patientName_$mobile', value: pName);
+                }
+                if (pAddr.isNotEmpty) {
+                  await AppStorage.write(key: 'patientAddress', value: pAddr);
+                  await AppStorage.write(key: 'patientAddress_$mobile', value: pAddr);
+                }
+                if (pGender.isNotEmpty) {
+                  await AppStorage.write(key: 'patientGender_$mobile', value: pGender);
+                }
+                if (pDob.isNotEmpty) {
+                  await AppStorage.write(key: 'patientDob_$mobile', value: pDob);
+                }
+              }
+
+              final bool isNewUser = data['isNewUser'] == true;
+              if (isNewUser) {
                 context.go('/register');
               } else {
                 context.go('/home');

@@ -525,17 +525,52 @@ class ApiService {
         await _storage.write(key: 'userMobile', value: userMobile);
 
         // Check if user has already registered a profile with this mobile
-        final existingName = await _storage.read(key: 'patientName_$userMobile') ?? await _storage.read(key: 'patientName');
+        String? existingName = await _storage.read(key: 'patientName_$userMobile') ?? await _storage.read(key: 'patientName');
+        String? existingAddr = await _storage.read(key: 'patientAddress_$userMobile') ?? await _storage.read(key: 'patientAddress');
+        String? existingEmail = await _storage.read(key: 'patientEmail_$userMobile') ?? await _storage.read(key: 'patientEmail');
+
+        // If local storage is empty (e.g. app freshly reinstalled), attempt to query live MongoDB via /patients?mobile=
+        if (existingName == null || existingName.isEmpty) {
+          try {
+            final checkRes = await _dio.get('/patients', queryParameters: {'mobile': userMobile});
+            if (checkRes.statusCode == 200 && checkRes.data is Map && checkRes.data['patient'] != null) {
+              final p = checkRes.data['patient'];
+              final dbName = p['name']?.toString() ?? '';
+              if (dbName.isNotEmpty && !dbName.startsWith('Patient (') && dbName.toLowerCase() != 'patient') {
+                existingName = dbName;
+                existingAddr = p['address']?.toString() ??
+                    (p['savedAddresses'] is List && (p['savedAddresses'] as List).isNotEmpty
+                        ? (p['savedAddresses'][0] is Map
+                            ? p['savedAddresses'][0]['addressLine']?.toString()
+                            : p['savedAddresses'][0].toString())
+                        : null);
+                existingEmail = p['userId'] is Map ? p['userId']['email']?.toString() : null;
+              }
+            }
+          } catch (_) {}
+        }
+
         final isNewUser = (existingName == null || existingName.trim().isEmpty);
 
         String activeName = existingName ?? '';
         await _storage.write(key: 'patientName', value: activeName);
+        if (userMobile.isNotEmpty && activeName.isNotEmpty) {
+          await _storage.write(key: 'patientName_$userMobile', value: activeName);
+        }
 
-        final existingAddr = await _storage.read(key: 'patientAddress_$userMobile') ?? await _storage.read(key: 'patientAddress') ?? '';
-        await _storage.write(key: 'patientAddress', value: existingAddr);
+        if (existingAddr != null && existingAddr.isNotEmpty) {
+          await _storage.write(key: 'patientAddress', value: existingAddr);
+          if (userMobile.isNotEmpty) {
+            await _storage.write(key: 'patientAddress_$userMobile', value: existingAddr);
+          }
+        }
 
-        final existingEmail = await _storage.read(key: 'patientEmail_$userMobile') ?? await _storage.read(key: 'patientEmail') ?? '';
-        await _storage.write(key: 'patientEmail', value: existingEmail);
+        if (existingEmail != null && existingEmail.isNotEmpty) {
+          await _storage.write(key: 'patientEmail', value: existingEmail);
+          if (userMobile.isNotEmpty) {
+            await _storage.write(key: 'patientEmail_$userMobile', value: existingEmail);
+          }
+        }
 
         final existingPhoto = await _storage.read(key: 'patientPhoto_$userMobile') ?? await _storage.read(key: 'patientPhoto') ?? '';
         await _storage.write(key: 'patientPhoto', value: existingPhoto);
