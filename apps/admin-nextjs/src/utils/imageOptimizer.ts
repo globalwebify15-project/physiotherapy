@@ -10,10 +10,11 @@ import path from 'path';
  * @param doctorName Name of the doctor to generate a clean, SEO-friendly filename
  * @returns Relative public path (e.g. "/doctors/dr_rajesh_1740000000.webp")
  */
-export async function processAndSaveDoctorImage(file: File, doctorName: string): Promise<string> {
-  if (!file || file.size === 0) return '';
+export async function processAndSaveDoctorImage(file: File | Buffer, doctorName: string): Promise<string> {
+  if (!file) return '';
 
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const buffer = Buffer.isBuffer(file) ? file : Buffer.from(await (file as File).arrayBuffer());
+  if (buffer.length === 0) return '';
 
   // Optimize and convert to WebP using sharp
   const webpBuffer = await sharp(buffer)

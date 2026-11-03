@@ -1,17 +1,8 @@
 import React from 'react';
 import { connectDB, Appointment, Therapist, Patient, Service, Notification } from 'database';
 import { revalidatePath } from 'next/cache';
-import ViewSwitcher from '@/components/ViewSwitcher';
-import { 
-  Calendar, 
-  User, 
-  MapPin, 
-  Briefcase, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle 
-} from 'lucide-react';
+import AppointmentsDirectoryClient from '@/components/AppointmentsDirectoryClient';
+import { Clock, CheckCircle2, UserCheck, AlertTriangle } from 'lucide-react';
 
 export const revalidate = 0; // Dynamic fetch
 
@@ -83,7 +74,7 @@ async function updateAppointment(formData: FormData) {
 export default async function AppointmentsPage() {
   await connectDB();
 
-  // Fetch appointments, therapists, and patients concurrently
+  // Fetch appointments and therapists concurrently
   const [appointments, therapists] = await Promise.all([
     Appointment.find()
       .populate({ path: 'patientId', model: Patient })
@@ -94,328 +85,73 @@ export default async function AppointmentsPage() {
     Therapist.find({ isActive: true }).sort({ name: 1 }).lean(),
   ]);
 
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-amber-50 text-amber-700 border-amber-200/50';
-      case 'confirmed':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200/50';
-      case 'assigned':
-        return 'bg-teal-50 text-teal-700 border-teal-200/50';
-      case 'in-progress':
-        return 'bg-blue-50 text-blue-700 border-blue-200/50';
-      case 'completed':
-        return 'bg-slate-100 text-slate-700 border-slate-200';
-      case 'cancelled':
-        return 'bg-rose-50 text-rose-700 border-rose-200/50';
-      default:
-        return 'bg-slate-50 text-slate-500 border-slate-200';
-    }
-  };
+  const pendingCount = appointments.filter(a => a.status === 'pending').length;
+  const activeCount = appointments.filter(a => a.status === 'in-progress' || a.status === 'assigned' || a.status === 'confirmed').length;
+  const completedCount = appointments.filter(a => a.status === 'completed').length;
+  const totalCount = appointments.length;
 
   return (
-    <div className="space-y-8">
-      {/* Title block */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">Appointment Management</h1>
-        <p className="text-sm text-slate-400 font-medium mt-1">
-          Monitor visits, manage schedules, assign therapists, and update appointment states.
-        </p>
+    <div className="space-y-6">
+      {/* Title & Stats */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Appointment Management</h1>
+          <p className="text-sm text-slate-400 font-medium mt-1">
+            Monitor visits, manage schedules, assign therapists, and update appointment states.
+          </p>
+        </div>
       </div>
 
-      {/* Main Appointments Feed Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
-        {/* Left 2 Columns: Appointments List & Table */}
-        <div className="xl:col-span-2 space-y-4">
-          <ViewSwitcher
-            label="Appointments Directory"
-            totalCount={appointments.length}
-            defaultView="table"
-            tableView={
-              appointments.length === 0 ? (
-                <div className="bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                  <Calendar className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-                  <h3 className="font-bold text-slate-800 text-lg">No appointments scheduled</h3>
-                  <p className="text-slate-400 text-sm mt-1">Bookings requested by patients will appear here.</p>
-                </div>
-              ) : (
-                <div className="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                          <th className="py-3.5 px-4">Visit & Ref</th>
-                          <th className="py-3.5 px-4">Patient</th>
-                          <th className="py-3.5 px-4">Service</th>
-                          <th className="py-3.5 px-4">Date & Time</th>
-                          <th className="py-3.5 px-4 min-w-[200px]">Assigned Therapist</th>
-                          <th className="py-3.5 px-4">Status</th>
-                          <th className="py-3.5 px-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                        {appointments.map((appt: any) => (
-                          <tr key={appt._id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="py-3 px-4">
-                              <span className="text-[10px] font-extrabold text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-md inline-block mb-1">
-                                {appt.visitType.toUpperCase()}
-                              </span>
-                              <div className="text-[10px] text-slate-400 font-mono">
-                                #{appt._id.toString().slice(-6)}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-slate-900">{appt.patientId?.name || 'Unknown Patient'}</div>
-                              {appt.visitType === 'home' && appt.address && (
-                                <div className="text-[10px] text-slate-400 truncate max-w-[160px]" title={appt.address}>
-                                  {appt.address}
-                                </div>
-                              )}
-                            </td>
-                            <td className="py-3 px-4 text-slate-800 font-semibold">
-                              {appt.serviceId?.title || 'General Physiotherapy'}
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="font-bold text-slate-800">{appt.date}</div>
-                              <div className="text-[10px] text-slate-400">{appt.timeSlot}</div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <form action={updateAppointment} className="flex items-center gap-1.5">
-                                <input type="hidden" name="appointmentId" value={appt._id.toString()} />
-                                <select 
-                                  name="therapistId" 
-                                  defaultValue={appt.therapistId?._id?.toString() || ''}
-                                  className="text-[11px] bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 font-medium text-slate-700 focus:outline-none focus:border-teal-500 w-full"
-                                >
-                                  <option value="">-- Assign --</option>
-                                  {therapists.map((t: any) => (
-                                    <option key={String(t._id)} value={String(t._id)}>
-                                      {t.name}
-                                    </option>
-                                  ))}
-                                </select>
-                                <button 
-                                  type="submit" 
-                                  className="bg-teal-600 hover:bg-teal-700 text-white text-[10px] font-bold px-2 py-1 rounded-md transition-colors shrink-0"
-                                >
-                                  Set
-                                </button>
-                              </form>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${getStatusStyle(appt.status)}`}>
-                                {appt.status}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              {appt.status !== 'completed' && appt.status !== 'cancelled' ? (
-                                <div className="flex items-center justify-end gap-1.5">
-                                  <form action={updateAppointment}>
-                                    <input type="hidden" name="appointmentId" value={appt._id.toString()} />
-                                    <input type="hidden" name="status" value="completed" />
-                                    <button 
-                                      type="submit" 
-                                      title="Mark Completed"
-                                      className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
-                                    >
-                                      <CheckCircle size={12} />
-                                      Done
-                                    </button>
-                                  </form>
-                                  <form action={updateAppointment}>
-                                    <input type="hidden" name="appointmentId" value={appt._id.toString()} />
-                                    <input type="hidden" name="status" value="cancelled" />
-                                    <button 
-                                      type="submit" 
-                                      title="Cancel Appointment"
-                                      className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 transition-colors"
-                                    >
-                                      <XCircle size={12} />
-                                      Cancel
-                                    </button>
-                                  </form>
-                                </div>
-                              ) : (
-                                <span className="text-slate-400 text-[10px] italic">Archived</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )
-            }
-            cardView={
-              appointments.length === 0 ? (
-                <div className="bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                  <Calendar className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-                  <h3 className="font-bold text-slate-800 text-lg">No appointments scheduled</h3>
-                  <p className="text-slate-400 text-sm mt-1">Bookings requested by patients will appear here.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {appointments.map((appt: any) => (
-                    <div 
-                      key={appt._id} 
-                      className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 space-y-4"
-                    >
-                      {/* Top header row */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-extrabold text-teal-700 bg-teal-50 border border-teal-100/60 px-3 py-1 rounded-lg">
-                            {appt.visitType.toUpperCase()}
-                          </span>
-                          <span className="text-xs text-slate-400 font-semibold">
-                            Ref: {appt._id.toString().slice(-6)}
-                          </span>
-                        </div>
-                        <span className={`px-2.5 py-1 text-xs font-bold rounded-full border ${getStatusStyle(appt.status)}`}>
-                          {appt.status}
-                        </span>
-                      </div>
-
-                      {/* Main detail columns */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm font-medium text-slate-600">
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-slate-800">
-                            <User size={16} className="text-slate-400" />
-                            <span className="font-bold">{appt.patientId?.name || 'Unknown Patient'}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Briefcase size={16} className="text-slate-400" />
-                            <span>{appt.serviceId?.title || 'General Physiotherapy'}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Clock size={16} className="text-slate-400" />
-                            <span>{appt.date} @ {appt.timeSlot}</span>
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          {appt.visitType === 'home' && appt.address && (
-                            <div className="flex items-start gap-2">
-                              <MapPin size={16} className="text-slate-400 mt-0.5 shrink-0" />
-                              <span className="text-xs text-slate-500 leading-tight">{appt.address}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-slate-400">Assigned Therapist:</span>
-                            <span className="text-xs font-bold text-slate-700">
-                              {appt.therapistId?.name || 'Not assigned'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Admin controls row */}
-                      <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
-                        
-                        {/* Form: Assign Therapist */}
-                        <form action={updateAppointment} className="flex items-center gap-2 max-w-xs w-full">
-                          <input type="hidden" name="appointmentId" value={appt._id.toString()} />
-                          <select 
-                            name="therapistId" 
-                            defaultValue={appt.therapistId?._id?.toString() || ''}
-                            className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-medium text-slate-700 focus:outline-none focus:border-teal-500 flex-1"
-                          >
-                            <option value="">-- Assign Therapist --</option>
-                            {therapists.map((t: any) => (
-                              <option key={String(t._id)} value={String(t._id)}>
-                                {t.name}
-                              </option>
-                            ))}
-                          </select>
-                          <button 
-                            type="submit" 
-                            className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm shadow-teal-100"
-                          >
-                            Assign
-                          </button>
-                        </form>
-
-                        {/* Form Actions: Complete / Cancel */}
-                        <div className="flex items-center gap-2">
-                          {appt.status !== 'completed' && appt.status !== 'cancelled' && (
-                            <>
-                              <form action={updateAppointment}>
-                                <input type="hidden" name="appointmentId" value={appt._id.toString()} />
-                                <input type="hidden" name="status" value="completed" />
-                                <button 
-                                  type="submit" 
-                                  className="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
-                                >
-                                  <CheckCircle size={14} />
-                                  Complete
-                                </button>
-                              </form>
-
-                              <form action={updateAppointment}>
-                                <input type="hidden" name="appointmentId" value={appt._id.toString()} />
-                                <input type="hidden" name="status" value="cancelled" />
-                                <button 
-                                  type="submit" 
-                                  className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
-                                >
-                                  <XCircle size={14} />
-                                  Cancel
-                                </button>
-                              </form>
-                            </>
-                          )}
-                        </div>
-
-                      </div>
-
-                    </div>
-                  ))}
-                </div>
-              )
-            }
-          />
-        </div>
-
-        {/* Right 1 Column: Sidebar Widgets */}
-        <div className="space-y-6">
-          {/* Quick Stats Panel */}
-          <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm p-6">
-            <h3 className="font-bold text-slate-800 text-base mb-4">Operations Summary</h3>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <span className="text-xs font-semibold text-slate-500">Pending Assignment</span>
-                <span className="text-sm font-extrabold text-amber-600">
-                  {appointments.filter(a => a.status === 'pending').length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <span className="text-xs font-semibold text-slate-500">Active Visits</span>
-                <span className="text-sm font-extrabold text-blue-600">
-                  {appointments.filter(a => a.status === 'in-progress' || a.status === 'assigned' || a.status === 'confirmed').length}
-                </span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                <span className="text-xs font-semibold text-slate-500">Completed Sessions</span>
-                <span className="text-sm font-extrabold text-emerald-600">
-                  {appointments.filter(a => a.status === 'completed').length}
-                </span>
-              </div>
-            </div>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Bookings</p>
+            <p className="text-2xl font-black text-slate-800 mt-1">{totalCount}</p>
           </div>
-
-          {/* Guidelines info card */}
-          <div className="bg-teal-50/50 rounded-2xl border border-teal-100/60 p-6 flex gap-3">
-            <AlertCircle className="text-teal-600 shrink-0 mt-0.5" size={20} />
-            <div className="space-y-1">
-              <h4 className="text-sm font-bold text-teal-950">Therapist Scheduling Rules</h4>
-              <p className="text-xs text-teal-800/80 leading-relaxed">
-                Before assigning a therapist, check their schedule availability on the Therapists tab. The portal validates slot conflicts automatically to avoid double-bookings.
-              </p>
-            </div>
+          <div className="w-10 h-10 rounded-xl bg-teal-50 border border-teal-100 flex items-center justify-center text-teal-600">
+            <Clock size={20} />
           </div>
         </div>
 
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Pending Action</p>
+            <p className="text-2xl font-black text-amber-700 mt-1">{pendingCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600">
+            <AlertTriangle size={20} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Active Visits</p>
+            <p className="text-2xl font-black text-blue-700 mt-1">{activeCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200/60 flex items-center justify-center text-blue-600">
+            <UserCheck size={20} />
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200/70 p-4 shadow-xs flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Completed</p>
+            <p className="text-2xl font-black text-emerald-700 mt-1">{completedCount}</p>
+          </div>
+          <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/60 flex items-center justify-center text-emerald-600">
+            <CheckCircle2 size={20} />
+          </div>
+        </div>
+      </div>
+
+      {/* Full-width Appointments Directory with Search, Filters, CSV Export & Modals */}
+      <div className="w-full">
+        <AppointmentsDirectoryClient
+          appointments={JSON.parse(JSON.stringify(appointments))}
+          therapists={JSON.parse(JSON.stringify(therapists))}
+          updateAppointment={updateAppointment}
+        />
       </div>
     </div>
   );

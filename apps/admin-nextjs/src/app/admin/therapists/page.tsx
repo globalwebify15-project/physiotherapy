@@ -1,18 +1,7 @@
 import React from 'react';
 import { connectDB, Therapist } from 'database';
 import { revalidatePath } from 'next/cache';
-import ViewSwitcher from '@/components/ViewSwitcher';
-import { 
-  UserRound, 
-  Mail, 
-  Phone, 
-  GraduationCap, 
-  Plus, 
-  CalendarDays, 
-  Star,
-  Camera
-} from 'lucide-react';
-import EditTherapistModal from '@/components/EditTherapistModal';
+import TherapistsDirectoryClient from '@/components/TherapistsDirectoryClient';
 import { processAndSaveDoctorImage } from '@/utils/imageOptimizer';
 
 export const revalidate = 0; // Dynamic fetch
@@ -29,16 +18,21 @@ async function onboardTherapistAction(formData: FormData) {
   const imageFile = formData.get('profileImage') as File | null;
   
   let profilePhoto = '';
-  if (imageFile && imageFile.size > 0) {
+  if (imageFile && imageFile.size > 0 && typeof imageFile.arrayBuffer === 'function') {
     try {
-      profilePhoto = await processAndSaveDoctorImage(imageFile, name);
-    } catch (err) {
-      console.error('Error optimizing doctor image:', err);
+      const arrayBuf = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+      const optimizedWebpPath = await processAndSaveDoctorImage(buffer, name);
+      if (optimizedWebpPath) {
+        profilePhoto = optimizedWebpPath;
+      }
+    } catch (e) {
+      console.error('[THERAPIST IMAGE UPLOAD ERROR]:', e);
     }
   }
 
   const specialization = specializationStr
-    ? specializationStr.split(',').map((s) => s.trim()).filter(Boolean)
+    ? specializationStr.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
     : [];
 
   await connectDB();
@@ -46,19 +40,17 @@ async function onboardTherapistAction(formData: FormData) {
     name,
     email,
     mobile,
-    profilePhoto,
     qualification,
     experience,
     specialization,
-    workingHours: { start: '09:00', end: '19:00' },
-    workingDays: [0, 1, 2, 3, 4, 5, 6], // Monday-Sunday
+    profilePhoto: profilePhoto || undefined,
     isActive: true,
   });
 
   revalidatePath('/admin/therapists');
 }
 
-// Server Action to update an existing therapist
+// Server Action to update a therapist
 async function updateTherapistAction(formData: FormData) {
   'use server';
   const therapistId = formData.get('therapistId') as string;
@@ -75,37 +67,42 @@ async function updateTherapistAction(formData: FormData) {
   if (!therapistId) return;
 
   const specialization = specializationStr
-    ? specializationStr.split(',').map((s) => s.trim()).filter(Boolean)
+    ? specializationStr.split(',').map((s) => s.trim()).filter((s) => s.length > 0)
     : [];
 
-  const updateData: any = {
+  const updateFields: any = {
     name,
     email,
     mobile,
     qualification,
     experience,
     specialization,
-    workingHours: { start: startTime, end: endTime },
+    workingHours: {
+      start: startTime,
+      end: endTime,
+    },
   };
 
-  if (imageFile && imageFile.size > 0) {
+  if (imageFile && imageFile.size > 0 && typeof imageFile.arrayBuffer === 'function') {
     try {
-      const profilePhoto = await processAndSaveDoctorImage(imageFile, name);
-      if (profilePhoto) {
-        updateData.profilePhoto = profilePhoto;
+      const arrayBuf = await imageFile.arrayBuffer();
+      const buffer = Buffer.from(arrayBuf);
+      const optimizedWebpPath = await processAndSaveDoctorImage(buffer, name);
+      if (optimizedWebpPath) {
+        updateFields.profilePhoto = optimizedWebpPath;
       }
-    } catch (err) {
-      console.error('Error optimizing doctor image on update:', err);
+    } catch (e) {
+      console.error('[THERAPIST IMAGE UPDATE ERROR]:', e);
     }
   }
 
   await connectDB();
-  await Therapist.findByIdAndUpdate(therapistId, updateData);
+  await Therapist.findByIdAndUpdate(therapistId, updateFields);
 
   revalidatePath('/admin/therapists');
 }
 
-// Server Action to deactivate/delete a therapist
+// Server Action to delete a therapist (soft delete)
 async function deleteTherapistAction(formData: FormData) {
   'use server';
   const therapistId = formData.get('therapistId') as string;
@@ -123,344 +120,22 @@ export default async function TherapistsPage() {
   const therapists = await Therapist.find({ isActive: true }).sort({ name: 1 }).lean();
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Title Block */}
+    <div className="space-y-6 animate-fade-in w-full">
+      {/* Title block */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Therapist Management</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Therapists & Doctor Management</h1>
         <p className="text-sm text-slate-400 font-medium mt-1">
           Manage practitioner details, onboard staff, edit doctor schedules, and review specialties.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        
-        {/* Left Column: Onboard Form */}
-        <div className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm self-start">
-          <div className="flex items-center gap-2 mb-6">
-            <div className="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
-              <Plus size={18} />
-            </div>
-            <h3 className="font-bold text-slate-800 text-lg">Onboard Therapist</h3>
-          </div>
-
-          <form action={onboardTherapistAction} className="space-y-4">
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Full Name</label>
-              <input 
-                type="text" 
-                name="name" 
-                required 
-                placeholder="Dr. Rajesh Kumar" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Email</label>
-                <input 
-                  type="email" 
-                  name="email" 
-                  required 
-                  placeholder="rajesh@clinic.com" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Mobile</label>
-                <input 
-                  type="text" 
-                  name="mobile" 
-                  required 
-                  placeholder="9110912544" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Qualification</label>
-              <input 
-                type="text" 
-                name="qualification" 
-                required 
-                placeholder="MPT (Sports Medicine), BPT" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Experience (Years)</label>
-                <input 
-                  type="number" 
-                  name="experience" 
-                  required 
-                  min="0"
-                  placeholder="5" 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Working Days</label>
-                <div className="text-xs font-bold text-slate-500 bg-slate-100/50 p-2.5 rounded-xl border border-slate-200/40 mt-1 select-none">
-                  Mon - Sun (Daily)
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Specializations (Comma separated)</label>
-              <input 
-                type="text" 
-                name="specialization" 
-                placeholder="Dry Needling, Joint Mobilization, Posture Correction" 
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-medium text-slate-700 focus:outline-none focus:border-teal-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">
-                Doctor Headshot / Photo (Auto-WebP Optimised)
-              </label>
-              <div className="relative">
-                <input 
-                  type="file" 
-                  name="profileImage" 
-                  accept="image/png, image/jpeg, image/jpg, image/webp"
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-600 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer focus:outline-none focus:border-teal-500"
-                />
-              </div>
-              <p className="text-[10px] text-teal-700 font-semibold mt-1">
-                ⚡ Automatically cropped, compressed & converted to high-speed <strong>.webp</strong> in the public folder.
-              </p>
-            </div>
-
-            <button 
-              type="submit" 
-              className="w-full mt-4 bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-teal-100"
-            >
-              Add Therapist
-            </button>
-          </form>
-        </div>
-
-        {/* Right 2 Columns: Therapists View Switcher (Table default / Cards toggle) */}
-        <div className="xl:col-span-2 space-y-4">
-          <ViewSwitcher
-            label="Therapists & Doctors"
-            totalCount={therapists.length}
-            defaultView="table"
-            tableView={
-              therapists.length === 0 ? (
-                <div className="bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                  <UserRound className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-                  <h3 className="font-bold text-slate-800 text-lg">No active practitioners</h3>
-                  <p className="text-slate-400 text-sm mt-1">Add details on the left form to onboard new therapists.</p>
-                </div>
-              ) : (
-                <div className="bg-white rounded-2xl border border-slate-200/70 shadow-xs overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-100 text-slate-500 font-bold uppercase tracking-wider text-[10px]">
-                          <th className="py-3.5 px-4">Practitioner</th>
-                          <th className="py-3.5 px-4">Experience</th>
-                          <th className="py-3.5 px-4">Rating</th>
-                          <th className="py-3.5 px-4">Contact</th>
-                          <th className="py-3.5 px-4">Hours</th>
-                          <th className="py-3.5 px-4">Specialization</th>
-                          <th className="py-3.5 px-4 text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
-                        {therapists.map((therapist: any) => (
-                          <tr key={therapist._id.toString()} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-3">
-                                {therapist.profilePhoto ? (
-                                  <img
-                                    src={therapist.profilePhoto}
-                                    alt={therapist.name}
-                                    className="w-10 h-10 rounded-full object-cover object-top border border-teal-500/20 shadow-2xs shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-sm border border-teal-100 shrink-0">
-                                    {therapist.name.charAt(0)}
-                                  </div>
-                                )}
-                                <div>
-                                  <div className="font-bold text-slate-900 text-sm">{therapist.name}</div>
-                                  <div className="text-[11px] text-slate-400 truncate max-w-[170px]" title={therapist.qualification}>
-                                    {therapist.qualification}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="font-bold text-slate-800">{therapist.experience} yrs</span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/50 px-2 py-0.5 rounded-md text-[11px] font-bold">
-                                <Star size={11} fill="currentColor" className="text-amber-500" />
-                                {therapist.ratingAverage || 5}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="text-slate-800 font-medium">{therapist.mobile}</div>
-                              <div className="text-[10px] text-slate-400 truncate max-w-[140px]">{therapist.email}</div>
-                            </td>
-                            <td className="py-3 px-4 text-[11px] text-slate-600">
-                              {therapist.workingHours?.start || '09:00'} - {therapist.workingHours?.end || '19:00'}
-                            </td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-1 flex-wrap max-w-[200px]">
-                                {therapist.specialization && therapist.specialization.slice(0, 2).map((spec: string, idx: number) => (
-                                  <span key={idx} className="text-[9px] font-bold text-teal-700 bg-teal-50 border border-teal-100 px-1.5 py-0.5 rounded">
-                                    {spec}
-                                  </span>
-                                ))}
-                                {therapist.specialization && therapist.specialization.length > 2 && (
-                                  <span className="text-[9px] text-slate-400 font-bold">+{therapist.specialization.length - 2}</span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="py-3 px-4 text-right">
-                              <EditTherapistModal
-                                therapist={{
-                                  _id: therapist._id.toString(),
-                                  name: String(therapist.name),
-                                  email: String(therapist.email),
-                                  mobile: String(therapist.mobile),
-                                  qualification: String(therapist.qualification),
-                                  experience: Number(therapist.experience),
-                                  specialization: therapist.specialization ? Array.from(therapist.specialization).map(String) : [],
-                                  workingHours: {
-                                    start: String(therapist.workingHours?.start || '09:00'),
-                                    end: String(therapist.workingHours?.end || '19:00'),
-                                  },
-                                  ratingAverage: Number(therapist.ratingAverage || 5),
-                                  profilePhoto: therapist.profilePhoto ? String(therapist.profilePhoto) : undefined,
-                                }}
-                                onUpdate={updateTherapistAction}
-                                onDelete={deleteTherapistAction}
-                              />
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )
-            }
-            cardView={
-              therapists.length === 0 ? (
-                <div className="col-span-2 bg-white p-12 rounded-2xl border border-slate-200/60 shadow-sm text-center">
-                  <UserRound className="mx-auto text-slate-300 w-12 h-12 mb-4" />
-                  <h3 className="font-bold text-slate-800 text-lg">No active practitioners</h3>
-                  <p className="text-slate-400 text-sm mt-1">Add details on the left form to onboard new therapists.</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {therapists.map((therapist: any) => (
-                    <div 
-                      key={therapist._id.toString()} 
-                      className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
-                    >
-                      <div className="space-y-4">
-                        {/* Avatar and rating header */}
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            {therapist.profilePhoto ? (
-                              <img
-                                src={therapist.profilePhoto}
-                                alt={therapist.name}
-                                className="w-12 h-12 rounded-full object-cover object-top border-2 border-teal-500/20 shadow-xs"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-teal-50 flex items-center justify-center text-teal-700 font-extrabold text-base border border-teal-100">
-                                {therapist.name.charAt(0)}
-                              </div>
-                            )}
-                            <div>
-                              <h4 className="font-bold text-slate-800 text-base leading-snug">{therapist.name}</h4>
-                              <span className="text-xs font-semibold text-slate-400">Experience: {therapist.experience} years</span>
-                            </div>
-                          </div>
-                          <div className="bg-amber-50 text-amber-600 px-2.5 py-1 rounded-lg border border-amber-200/30 flex items-center gap-1 text-xs font-bold shrink-0">
-                            <Star size={12} fill="currentColor" />
-                            {therapist.ratingAverage}
-                          </div>
-                        </div>
-
-                        {/* Body stats lists */}
-                        <div className="space-y-2.5 text-sm font-medium text-slate-500">
-                          <div className="flex items-center gap-2">
-                            <GraduationCap size={16} className="text-slate-400" />
-                            <span className="text-xs text-slate-600 truncate block">{therapist.qualification}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Mail size={16} className="text-slate-400" />
-                            <span className="text-xs">{therapist.email}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Phone size={16} className="text-slate-400" />
-                            <span className="text-xs">{therapist.mobile}</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <CalendarDays size={16} className="text-slate-400" />
-                            <span className="text-xs">
-                              Hrs: {therapist.workingHours?.start || '09:00'} - {therapist.workingHours?.end || '19:00'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Specialties footer labels */}
-                      {therapist.specialization && therapist.specialization.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap gap-1.5">
-                          {therapist.specialization.map((spec: string, idx: number) => (
-                            <span 
-                              key={idx} 
-                              className="text-[10px] font-bold text-teal-700 bg-teal-50 border border-teal-100/60 px-2 py-0.5 rounded-md"
-                            >
-                              {spec}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Edit & Delete Action Buttons */}
-                      <EditTherapistModal
-                        therapist={{
-                          _id: therapist._id.toString(),
-                          name: String(therapist.name),
-                          email: String(therapist.email),
-                          mobile: String(therapist.mobile),
-                          qualification: String(therapist.qualification),
-                          experience: Number(therapist.experience),
-                          specialization: therapist.specialization ? Array.from(therapist.specialization).map(String) : [],
-                          workingHours: {
-                            start: String(therapist.workingHours?.start || '09:00'),
-                            end: String(therapist.workingHours?.end || '19:00'),
-                          },
-                          ratingAverage: Number(therapist.ratingAverage || 5),
-                          profilePhoto: therapist.profilePhoto ? String(therapist.profilePhoto) : undefined,
-                        }}
-                        onUpdate={updateTherapistAction}
-                        onDelete={deleteTherapistAction}
-                      />
-
-                    </div>
-                  ))}
-                </div>
-              )
-            }
-          />
-        </div>
-
-      </div>
+      {/* Full-width Interactive Directory with Search, Filters, CSV Export & Onboard Modal */}
+      <TherapistsDirectoryClient
+        therapists={JSON.parse(JSON.stringify(therapists))}
+        onAdd={onboardTherapistAction}
+        onUpdate={updateTherapistAction}
+        onDelete={deleteTherapistAction}
+      />
     </div>
   );
 }
