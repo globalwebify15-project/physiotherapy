@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { UserPlus, X, Mail, Phone, KeyRound, ShieldCheck, Loader2 } from 'lucide-react';
+import { useToast } from './ToastProvider';
 
 interface AddStaffModalProps {
   onAdd: (formData: FormData) => Promise<void>;
@@ -10,16 +11,19 @@ interface AddStaffModalProps {
 export default function AddStaffModal({ onAdd }: AddStaffModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     try {
       const formData = new FormData(e.currentTarget);
+      const email = (formData.get('email') as string) || 'Staff';
       await onAdd(formData);
+      toast.success('Staff Account Created', `Login credentials provisioned for ${email}.`);
       setIsOpen(false);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      toast.error('Provisioning Failed', err?.message || 'Could not provision staff account.');
     } finally {
       setLoading(false);
     }

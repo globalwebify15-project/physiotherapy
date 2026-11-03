@@ -3,6 +3,7 @@ import { connectDB, CMS } from 'database';
 import { revalidatePath } from 'next/cache';
 import EditFaqModal from '@/components/EditFaqModal';
 import EditOfferModal from '@/components/EditOfferModal';
+import CmsSubmitButton from '@/components/CmsSubmitButton';
 import { 
   Settings, 
   Phone, 
@@ -728,13 +729,13 @@ export default async function CMSPage() {
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-5 rounded-xl flex items-center gap-2 text-xs ml-auto transition-colors shadow-xs"
-            >
-              <Save size={15} />
-              Save Contact Settings
-            </button>
+            <div className="flex justify-end pt-2">
+              <CmsSubmitButton 
+                label="Save Contact Settings" 
+                successTitle="Contact Settings Saved" 
+                successMsg="Updated clinic support phone numbers, email & address." 
+              />
+            </div>
           </form>
         </div>
 
@@ -847,12 +848,13 @@ export default async function CMSPage() {
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              className="bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl ml-auto block transition-colors shadow-xs"
-            >
-              Add Banner to Mobile App
-            </button>
+            <div className="flex justify-end pt-2">
+              <CmsSubmitButton 
+                label="Add Banner to Mobile App" 
+                successTitle="Banner Added" 
+                successMsg="New promotional hero banner published to mobile app." 
+              />
+            </div>
           </form>
 
           {/* List of active banners */}
@@ -969,13 +971,13 @@ export default async function CMSPage() {
               />
             </div>
 
-            <button 
-              type="submit" 
-              className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-5 rounded-xl flex items-center gap-2 text-xs ml-auto transition-colors shadow-xs"
-            >
-              <Save size={15} />
-              Save Clinic Profile
-            </button>
+            <div className="flex justify-end pt-2">
+              <CmsSubmitButton 
+                label="Save Clinic Profile" 
+                successTitle="Clinic Profile Saved" 
+                successMsg="Updated founder story, clinical experience, and credentials." 
+              />
+            </div>
           </form>
         </div>
 
@@ -1023,13 +1025,13 @@ export default async function CMSPage() {
               />
             </div>
 
-            <button 
-              type="submit" 
-              className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-5 rounded-xl flex items-center gap-2 text-xs ml-auto transition-colors shadow-xs"
-            >
-              <Save size={15} />
-              Save Policies
-            </button>
+            <div className="flex justify-end pt-2">
+              <CmsSubmitButton 
+                label="Save Policies" 
+                successTitle="Policies Saved" 
+                successMsg="Terms of service, privacy & cancellation updated." 
+              />
+            </div>
           </form>
 
           {/* FAQ section */}
@@ -1053,12 +1055,13 @@ export default async function CMSPage() {
                 placeholder="Answer details..." 
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-teal-500 resize-none"
               />
-              <button 
-                type="submit" 
-                className="bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg ml-auto block transition-colors"
-              >
-                Add FAQ
-              </button>
+              <div className="flex justify-end pt-1">
+                <CmsSubmitButton 
+                  label="Add FAQ" 
+                  successTitle="FAQ Added" 
+                  successMsg="New question added to patient knowledge base." 
+                />
+              </div>
             </form>
 
             <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1">
@@ -1252,13 +1255,13 @@ export default async function CMSPage() {
                 />
               </div>
 
-              <button 
-                type="submit" 
-                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 text-xs transition-colors shadow-xs"
-              >
-                <Plus size={15} />
-                Create Promo Coupon
-              </button>
+              <div className="pt-2">
+                <CmsSubmitButton 
+                  label="Create Promo Coupon" 
+                  successTitle="Promo Code Created" 
+                  successMsg="New discount coupon published for mobile bookings." 
+                />
+              </div>
             </form>
           </div>
 

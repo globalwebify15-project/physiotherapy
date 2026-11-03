@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import DirectoryToolbar from './DirectoryToolbar';
 import { exportToCsv } from '@/utils/exportCsv';
+import { useToast } from './ToastProvider';
 import { 
   Star, 
   MessageSquare, 
@@ -22,6 +23,7 @@ export default function ReviewsDirectoryClient({
   reviews,
   toggleReviewModeration,
 }: ReviewsDirectoryClientProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
@@ -72,6 +74,20 @@ export default function ReviewsDirectoryClient({
     });
   }, [reviews, search, statusFilter, ratingFilter]);
 
+  const handleToggleModeration = async (formData: FormData, willBePublished: boolean) => {
+    try {
+      await toggleReviewModeration(formData);
+      toast.success(
+        willBePublished ? 'Review Published' : 'Review Hidden',
+        willBePublished
+          ? 'Patient testimonial is now visible publicly.'
+          : 'Testimonial has been unpublished from public clinic views.'
+      );
+    } catch (err: any) {
+      toast.error('Action Failed', err?.message || 'Could not update review status.');
+    }
+  };
+
   const handleExport = () => {
     const exportRows = filteredReviews.map((r) => ({
       'Patient Name': r.patientId?.name || 'Verified Patient',
@@ -84,6 +100,7 @@ export default function ReviewsDirectoryClient({
     }));
 
     exportToCsv(exportRows, `reviews_directory_${new Date().toISOString().slice(0, 10)}.csv`);
+    toast.success('Export Complete', `Exported ${exportRows.length} patient reviews.`);
   };
 
   return (
@@ -183,7 +200,12 @@ export default function ReviewsDirectoryClient({
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <form action={toggleReviewModeration} className="inline-block">
+                          <form
+                            action={async (fd) => {
+                              await handleToggleModeration(fd, !rev.isModerated);
+                            }}
+                            className="inline-block"
+                          >
                             <input type="hidden" name="reviewId" value={rev._id.toString()} />
                             <input type="hidden" name="currentStatus" value={rev.isModerated ? 'true' : 'false'} />
                             {rev.isModerated ? (
@@ -280,7 +302,11 @@ export default function ReviewsDirectoryClient({
                       {rev.isModerated ? 'Published' : 'Under Review'}
                     </span>
 
-                    <form action={toggleReviewModeration}>
+                    <form
+                      action={async (fd) => {
+                        await handleToggleModeration(fd, !rev.isModerated);
+                      }}
+                    >
                       <input type="hidden" name="reviewId" value={rev._id.toString()} />
                       <input type="hidden" name="currentStatus" value={rev.isModerated ? 'true' : 'false'} />
                       {rev.isModerated ? (

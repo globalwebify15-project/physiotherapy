@@ -3,7 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import DirectoryToolbar from './DirectoryToolbar';
 import BroadcastNotificationModal from './BroadcastNotificationModal';
+import ExportModal, { ColumnDef } from './ExportModal';
 import { exportToCsv } from '@/utils/exportCsv';
+import { useToast } from './ToastProvider';
 import { Bell, Megaphone, Clock, CheckCheck } from 'lucide-react';
 
 interface NotificationsDirectoryClientProps {
@@ -17,8 +19,10 @@ export default function NotificationsDirectoryClient({
   patients,
   onBroadcast,
 }: NotificationsDirectoryClientProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const categoryOptions = [
     { label: 'Announcements', value: 'announcement' },
@@ -55,7 +59,17 @@ export default function NotificationsDirectoryClient({
       'Read Status': n.isRead ? 'Read' : 'Delivered',
     }));
     exportToCsv('Notification_Dispatch_Log', exportRows);
+    toast.success('Export Complete', `Exported ${exportRows.length} notification logs.`);
   };
+
+  const exportColumns: ColumnDef[] = [
+    { key: 'title', label: 'Notification Title', accessor: (n) => n.title || 'N/A' },
+    { key: 'body', label: 'Message Body', accessor: (n) => n.body || 'N/A' },
+    { key: 'type', label: 'Category', accessor: (n) => n.type || 'announcement' },
+    { key: 'recipient', label: 'Recipient Mobile / User', accessor: (n) => n.userId?.mobile || 'Broadcast' },
+    { key: 'createdAt', label: 'Dispatched At', accessor: (n) => n.createdAt ? new Date(n.createdAt).toLocaleString() : 'N/A' },
+    { key: 'isRead', label: 'Read Status', accessor: (n) => n.isRead ? 'Read' : 'Delivered' },
+  ];
 
   const getTypeBadge = (type: string) => {
     switch (type) {
@@ -87,8 +101,20 @@ export default function NotificationsDirectoryClient({
         onFilterChange={setCategoryFilter}
         filterLabel="Category"
         onExport={handleExport}
+        onCustomExport={() => setIsExportModalOpen(true)}
         actionButton={<BroadcastNotificationModal patients={patients} onBroadcast={onBroadcast} />}
         showViewToggle={false}
+      />
+
+      {/* Custom Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Notifications Dispatch Log CSV with Custom Values"
+        data={notifications}
+        dateField="createdAt"
+        availableColumns={exportColumns}
+        filename="Notification_Dispatch_Log"
       />
 
       {/* Directory Content (Full Width Table) */}

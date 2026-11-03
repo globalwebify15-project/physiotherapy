@@ -2,7 +2,9 @@
 
 import React, { useState, useMemo } from 'react';
 import DirectoryToolbar from './DirectoryToolbar';
+import ExportModal, { ColumnDef } from './ExportModal';
 import { exportToCsv } from '@/utils/exportCsv';
+import { useToast } from './ToastProvider';
 import { 
   Users, 
   Phone, 
@@ -24,10 +26,12 @@ export default function PatientsDirectoryClient({
   statsMapData,
   updatePatientNotes,
 }: PatientsDirectoryClientProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState('all');
   const [visitFilter, setVisitFilter] = useState('all');
   const [view, setView] = useState<'table' | 'cards'>('table');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const genderOptions = [
     { label: 'Male Patients', value: 'male' },
@@ -96,7 +100,33 @@ export default function PatientsDirectoryClient({
       };
     });
 
-    exportToCsv(exportRows, `patients_directory_${new Date().toISOString().slice(0, 10)}.csv`);
+    exportToCsv(`Patients_Directory`, exportRows);
+    toast.success('Export Complete', `Downloaded ${exportRows.length} patient records.`);
+  };
+
+  const exportColumns: ColumnDef[] = [
+    { key: 'name', label: 'Patient Name', accessor: (p) => p.name || 'Unnamed' },
+    { key: 'gender', label: 'Gender', accessor: (p) => p.gender || 'N/A' },
+    { 
+      key: 'age', 
+      label: 'Age', 
+      accessor: (p) => p.dob ? Math.floor((new Date().getTime() - new Date(p.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 'N/A' 
+    },
+    { key: 'phone', label: 'Phone Number', accessor: (p) => p.userId?.mobile || p.emergencyContact?.phone || 'N/A' },
+    { key: 'emergency', label: 'Emergency Contact', accessor: (p) => p.emergencyContact ? `${p.emergencyContact.name} (${p.emergencyContact.phone})` : 'None' },
+    { key: 'address', label: 'Primary Address', accessor: (p) => (p.savedAddresses && p.savedAddresses[0]) || 'Not set' },
+    { key: 'visits', label: 'Total Visits', accessor: (p) => statsMapData[p._id]?.appointmentCount || 0 },
+    { key: 'lastVisit', label: 'Last Visit Date', accessor: (p) => statsMapData[p._id]?.lastAppointmentDate || 'Never' },
+    { key: 'history', label: 'Clinical History', accessor: (p) => (p.medicalHistory || []).join('; ') || 'None' },
+  ];
+
+  const handleSaveNote = async (formData: FormData, patientName: string) => {
+    try {
+      await updatePatientNotes(formData);
+      toast.success('Clinical Note Saved', `Recorded clinical note for ${patientName}.`);
+    } catch (err: any) {
+      toast.error('Save Failed', err?.message || 'Could not save note.');
+    }
   };
 
   return (
@@ -118,9 +148,21 @@ export default function PatientsDirectoryClient({
         onSecondaryFilterChange={setVisitFilter}
         secondaryFilterLabel="Visits"
         onExport={handleExport}
+        onCustomExport={() => setIsExportModalOpen(true)}
         showViewToggle={true}
         view={view}
         onViewChange={setView}
+      />
+
+      {/* Custom Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Patient Directory CSV with Custom Values"
+        data={patients}
+        dateField="createdAt"
+        availableColumns={exportColumns}
+        filename="Patients_Report"
       />
 
       {/* Directory Content */}
@@ -215,7 +257,12 @@ export default function PatientsDirectoryClient({
                                 ))}
                               </div>
                             )}
-                            <form action={updatePatientNotes} className="flex items-center gap-1">
+                            <form
+                              action={async (fd) => {
+                                await handleSaveNote(fd, patient.name || 'patient');
+                              }}
+                              className="flex items-center gap-1"
+                            >
                               <input type="hidden" name="patientId" value={patient._id.toString()} />
                               <input 
                                 type="text" 
@@ -226,7 +273,7 @@ export default function PatientsDirectoryClient({
                               />
                               <button 
                                 type="submit" 
-                                className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors shrink-0"
+                                className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-md transition-colors shrink-0 cursor-pointer"
                               >
                                 Save
                               </button>
@@ -338,7 +385,12 @@ export default function PatientsDirectoryClient({
 
                   {/* Add note form */}
                   <div className="mt-4 pt-3 border-t border-slate-100">
-                    <form action={updatePatientNotes} className="flex gap-2">
+                    <form
+                      action={async (fd) => {
+                        await handleSaveNote(fd, patient.name || 'patient');
+                      }}
+                      className="flex gap-2"
+                    >
                       <input type="hidden" name="patientId" value={patient._id.toString()} />
                       <input 
                         type="text" 
@@ -349,7 +401,7 @@ export default function PatientsDirectoryClient({
                       />
                       <button 
                         type="submit" 
-                        className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-colors shrink-0"
+                        className="bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition-colors shrink-0 cursor-pointer"
                       >
                         Add
                       </button>

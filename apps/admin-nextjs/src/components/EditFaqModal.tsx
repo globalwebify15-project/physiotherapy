@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Edit3, Trash2, X, Save, AlertTriangle } from 'lucide-react';
+import { useToast } from './ToastProvider';
 
 interface EditFaqModalProps {
   faq: {
@@ -19,6 +20,7 @@ export default function EditFaqModal({
   onUpdate,
   onDelete,
 }: EditFaqModalProps) {
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -26,22 +28,34 @@ export default function EditFaqModal({
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    formData.append('index', index.toString());
-    await onUpdate(formData);
-    setLoading(false);
-    setIsOpen(false);
+    try {
+      const formData = new FormData(e.currentTarget);
+      formData.append('index', index.toString());
+      await onUpdate(formData);
+      toast.success('FAQ Updated', 'Question & answer successfully modified.');
+      setIsOpen(false);
+    } catch (err: any) {
+      toast.error('Update Failed', err?.message || 'Could not update FAQ.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    formData.append('index', index.toString());
-    await onDelete(formData);
-    setLoading(false);
-    setIsDeleting(false);
-    setIsOpen(false);
+    try {
+      const formData = new FormData(e.currentTarget);
+      formData.append('index', index.toString());
+      await onDelete(formData);
+      toast.success('FAQ Deleted', 'Question removed from FAQ list.');
+      setIsDeleting(false);
+      setIsOpen(false);
+    } catch (err: any) {
+      toast.error('Delete Failed', err?.message || 'Could not delete FAQ.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

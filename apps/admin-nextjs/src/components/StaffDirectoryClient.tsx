@@ -3,7 +3,9 @@
 import React, { useState, useMemo } from 'react';
 import DirectoryToolbar from './DirectoryToolbar';
 import AddStaffModal from './AddStaffModal';
+import ExportModal, { ColumnDef } from './ExportModal';
 import { exportToCsv } from '@/utils/exportCsv';
+import { useToast } from './ToastProvider';
 import { Users, ShieldCheck, Mail, Phone, Lock, CheckCircle2, XCircle } from 'lucide-react';
 
 interface StaffDirectoryClientProps {
@@ -17,9 +19,11 @@ export default function StaffDirectoryClient({
   onAdd,
   onUpdate,
 }: StaffDirectoryClientProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const roleOptions = [
     { label: 'Super Administrator', value: 'superadmin' },
@@ -64,6 +68,24 @@ export default function StaffDirectoryClient({
       'Created At': u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : 'N/A',
     }));
     exportToCsv('Clinic_Staff_Roles', exportRows);
+    toast.success('Export Complete', `Exported ${exportRows.length} staff records.`);
+  };
+
+  const exportColumns: ColumnDef[] = [
+    { key: 'email', label: 'Email Address', accessor: (u) => u.email || 'N/A' },
+    { key: 'mobile', label: 'Mobile Number', accessor: (u) => u.mobile || 'N/A' },
+    { key: 'role', label: 'Assigned Role', accessor: (u) => u.role?.toUpperCase() || 'STAFF' },
+    { key: 'status', label: 'Account Status', accessor: (u) => u.isActive ? 'ACTIVE' : 'SUSPENDED' },
+    { key: 'createdAt', label: 'Registered Date', accessor: (u) => u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : 'N/A' },
+  ];
+
+  const handleStatusUpdate = async (formData: FormData, email: string) => {
+    try {
+      await onUpdate(formData);
+      toast.success('Staff Account Updated', `Access permissions updated for ${email}.`);
+    } catch (err: any) {
+      toast.error('Update Failed', err?.message || 'Could not update staff account.');
+    }
   };
 
   const getRoleBadge = (role: string) => {
@@ -100,8 +122,20 @@ export default function StaffDirectoryClient({
         onSecondaryFilterChange={setStatusFilter}
         secondaryFilterLabel="Status"
         onExport={handleExport}
+        onCustomExport={() => setIsExportModalOpen(true)}
         actionButton={<AddStaffModal onAdd={onAdd} />}
         showViewToggle={false}
+      />
+
+      {/* Custom Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Staff & Roles CSV with Custom Values"
+        data={staffUsers}
+        dateField="createdAt"
+        availableColumns={exportColumns}
+        filename="Staff_Directory"
       />
 
       {/* Directory Content (Full Width Table) */}
@@ -162,7 +196,12 @@ export default function StaffDirectoryClient({
                     <td className="py-3.5 px-5 text-right">
                       <div className="inline-flex items-center gap-2">
                         {/* Role update form */}
-                        <form action={onUpdate} className="inline-flex items-center gap-1.5">
+                        <form
+                          action={async (fd) => {
+                            await handleStatusUpdate(fd, u.email || 'staff');
+                          }}
+                          className="inline-flex items-center gap-1.5"
+                        >
                           <input type="hidden" name="userId" value={String(u._id)} />
                           <input type="hidden" name="actionType" value="update_role" />
                           <select
@@ -177,19 +216,24 @@ export default function StaffDirectoryClient({
                           </select>
                           <button
                             type="submit"
-                            className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md transition-colors shadow-2xs"
+                            className="bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold px-2 py-1 rounded-md transition-colors shadow-2xs cursor-pointer"
                           >
                             Set
                           </button>
                         </form>
 
                         {/* Status toggle form */}
-                        <form action={onUpdate} className="inline-block">
+                        <form
+                          action={async (fd) => {
+                            await handleStatusUpdate(fd, u.email || 'staff');
+                          }}
+                          className="inline-block"
+                        >
                           <input type="hidden" name="userId" value={String(u._id)} />
                           <input type="hidden" name="actionType" value="toggle_status" />
                           <button
                             type="submit"
-                            className={`text-[10px] font-bold px-2.5 py-1 rounded-md border transition-colors ${
+                            className={`text-[10px] font-bold px-2.5 py-1 rounded-md border transition-colors cursor-pointer ${
                               u.isActive
                                 ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
                                 : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'

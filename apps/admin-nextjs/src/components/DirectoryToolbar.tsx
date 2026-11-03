@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Search, X, Download, Table, LayoutGrid, Filter } from 'lucide-react';
+import { Search, X, Download, Table, LayoutGrid, Filter, Calendar, Settings2 } from 'lucide-react';
 
 export interface FilterOption {
   label: string;
@@ -30,8 +30,18 @@ export interface DirectoryToolbarProps {
   onSecondaryFilterChange?: (val: string) => void;
   secondaryFilterLabel?: string;
 
+  // Date Filter (optional, e.g. for Appointments, Payments)
+  showDateFilter?: boolean;
+  dateFilterValue?: string;
+  onDateFilterChange?: (val: string) => void;
+  customStartDate?: string;
+  onCustomStartDateChange?: (val: string) => void;
+  customEndDate?: string;
+  onCustomEndDateChange?: (val: string) => void;
+
   // Export
   onExport?: () => void;
+  onCustomExport?: () => void;
   exportLabel?: string;
 
   // Action Button (e.g. Add Modal)
@@ -58,7 +68,15 @@ export default function DirectoryToolbar({
   secondaryFilterValue,
   onSecondaryFilterChange,
   secondaryFilterLabel = 'Type',
+  showDateFilter = false,
+  dateFilterValue = 'all',
+  onDateFilterChange,
+  customStartDate = '',
+  onCustomStartDateChange,
+  customEndDate = '',
+  onCustomEndDateChange,
   onExport,
+  onCustomExport,
   exportLabel = 'Export CSV',
   actionButton,
   showViewToggle = true,
@@ -67,6 +85,7 @@ export default function DirectoryToolbar({
 }: DirectoryToolbarProps) {
   const isFiltered = (filterValue && filterValue !== 'all') || 
                      (secondaryFilterValue && secondaryFilterValue !== 'all') || 
+                     (showDateFilter && dateFilterValue !== 'all') ||
                      searchQuery.trim().length > 0;
 
   return (
@@ -91,8 +110,11 @@ export default function DirectoryToolbar({
                 onSearchChange('');
                 if (onFilterChange) onFilterChange('all');
                 if (onSecondaryFilterChange) onSecondaryFilterChange('all');
+                if (onDateFilterChange) onDateFilterChange('all');
+                if (onCustomStartDateChange) onCustomStartDateChange('');
+                if (onCustomEndDateChange) onCustomEndDateChange('');
               }}
-              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline"
+              className="text-[10px] font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
             >
               Reset Filters
             </button>
@@ -103,16 +125,29 @@ export default function DirectoryToolbar({
         <div className="flex items-center gap-2 ml-auto flex-wrap">
           {actionButton}
 
-          {onExport && (
-            <button
-              type="button"
-              onClick={onExport}
-              title="Download filtered CSV"
-              className="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl text-xs transition-colors shadow-2xs shrink-0"
-            >
-              <Download size={14} className="text-slate-500" />
-              <span>{exportLabel}</span>
-            </button>
+          {/* Export button (or Custom Export modal trigger) */}
+          {(onExport || onCustomExport) && (
+            <div className="inline-flex items-center rounded-xl bg-slate-100 border border-slate-200 p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={onCustomExport || onExport}
+                title="Download CSV report (Custom dates & columns)"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-slate-700 hover:text-slate-900 font-bold text-xs transition-colors cursor-pointer"
+              >
+                <Download size={14} className="text-slate-500" />
+                <span>{exportLabel}</span>
+              </button>
+              {onCustomExport && onExport && (
+                <button
+                  type="button"
+                  onClick={onCustomExport}
+                  title="Configure custom dates & column values for export"
+                  className="px-2 py-1.5 border-l border-slate-200 text-slate-500 hover:text-teal-700 hover:bg-slate-200/50 rounded-r-lg transition-colors cursor-pointer"
+                >
+                  <Settings2 size={13} />
+                </button>
+              )}
+            </div>
           )}
 
           {showViewToggle && onViewChange && (
@@ -120,7 +155,7 @@ export default function DirectoryToolbar({
               <button
                 type="button"
                 onClick={() => onViewChange('table')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-150 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-150 cursor-pointer ${
                   view === 'table'
                     ? 'bg-white text-teal-700 shadow-xs'
                     : 'text-slate-500 hover:text-slate-800'
@@ -132,7 +167,7 @@ export default function DirectoryToolbar({
               <button
                 type="button"
                 onClick={() => onViewChange('cards')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-150 ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all duration-150 cursor-pointer ${
                   view === 'cards'
                     ? 'bg-white text-teal-700 shadow-xs'
                     : 'text-slate-500 hover:text-slate-800'
@@ -147,9 +182,9 @@ export default function DirectoryToolbar({
       </div>
 
       {/* Bottom Row: Search Bar & Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-2 border-t border-slate-100">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-2 border-t border-slate-100 flex-wrap">
         {/* Search Input */}
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[220px]">
           <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
           <input
             type="text"
@@ -162,12 +197,53 @@ export default function DirectoryToolbar({
             <button
               type="button"
               onClick={() => onSearchChange('')}
-              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+              className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
               <X size={14} />
             </button>
           )}
         </div>
+
+        {/* Date Filter (Appointments & Payments) */}
+        {showDateFilter && onDateFilterChange && (
+          <div className="flex items-center gap-2">
+            <div className="relative shrink-0 flex items-center">
+              <Calendar size={13} className="absolute left-3 text-slate-400 pointer-events-none" />
+              <select
+                value={dateFilterValue}
+                onChange={(e) => onDateFilterChange(e.target.value)}
+                className="w-full sm:w-auto bg-slate-50 border border-slate-200/80 rounded-xl pl-8 pr-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-500 focus:bg-white cursor-pointer"
+              >
+                <option value="all">📅 All Dates</option>
+                <option value="today">Today</option>
+                <option value="yesterday">Yesterday</option>
+                <option value="last7">Last 7 Days</option>
+                <option value="thisMonth">This Month</option>
+                <option value="custom">Custom Range...</option>
+              </select>
+            </div>
+
+            {dateFilterValue === 'custom' && (
+              <div className="flex items-center gap-1.5 animate-fade-in">
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => onCustomStartDateChange && onCustomStartDateChange(e.target.value)}
+                  className="bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-teal-500"
+                  title="Start Date"
+                />
+                <span className="text-slate-400 text-xs font-bold">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => onCustomEndDateChange && onCustomEndDateChange(e.target.value)}
+                  className="bg-slate-50 border border-slate-200/80 rounded-xl px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-teal-500"
+                  title="End Date"
+                />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Primary Filter Dropdown */}
         {filterOptions && onFilterChange && (
@@ -175,7 +251,7 @@ export default function DirectoryToolbar({
             <select
               value={filterValue || 'all'}
               onChange={(e) => onFilterChange(e.target.value)}
-              className="w-full sm:w-auto bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-500 focus:bg-white"
+              className="w-full sm:w-auto bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-500 focus:bg-white cursor-pointer"
             >
               <option value="all">All {filterLabel}s</option>
               {filterOptions.map((opt) => (
@@ -193,7 +269,7 @@ export default function DirectoryToolbar({
             <select
               value={secondaryFilterValue || 'all'}
               onChange={(e) => onSecondaryFilterChange(e.target.value)}
-              className="w-full sm:w-auto bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-500 focus:bg-white"
+              className="w-full sm:w-auto bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:border-teal-500 focus:bg-white cursor-pointer"
             >
               <option value="all">All {secondaryFilterLabel}s</option>
               {secondaryFilterOptions.map((opt) => (
@@ -208,4 +284,3 @@ export default function DirectoryToolbar({
     </div>
   );
 }
-

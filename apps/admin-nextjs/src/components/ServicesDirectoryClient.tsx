@@ -4,7 +4,9 @@ import React, { useState, useMemo } from 'react';
 import DirectoryToolbar from './DirectoryToolbar';
 import AddServiceModal from './AddServiceModal';
 import EditServiceModal from './EditServiceModal';
+import ExportModal, { ColumnDef } from './ExportModal';
 import { exportToCsv } from '@/utils/exportCsv';
+import { useToast } from './ToastProvider';
 import { Activity, Clock, Building, MapPin } from 'lucide-react';
 
 interface ServicesDirectoryClientProps {
@@ -20,10 +22,12 @@ export default function ServicesDirectoryClient({
   onUpdate,
   onDelete,
 }: ServicesDirectoryClientProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [offeringFilter, setOfferingFilter] = useState('all');
   const [view, setView] = useState<'table' | 'cards'>('table');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Unique categories for filter
   const categoryOptions = useMemo(() => {
@@ -71,7 +75,19 @@ export default function ServicesDirectoryClient({
       'Description': s.description,
     }));
     exportToCsv('Physiotherapy_Services', exportRows);
+    toast.success('Export Complete', `Exported ${exportRows.length} treatments to CSV.`);
   };
+
+  const exportColumns: ColumnDef[] = [
+    { key: 'title', label: 'Service Title', accessor: (s) => s.title },
+    { key: 'category', label: 'Category', accessor: (s) => s.category },
+    { key: 'duration', label: 'Duration (Mins)', accessor: (s) => s.duration },
+    { key: 'clinicPrice', label: 'Clinic Price (₹)', accessor: (s) => s.clinicVisitAvailable ? s.pricingClinic : 'N/A' },
+    { key: 'homePrice', label: 'Home Price (₹)', accessor: (s) => s.homeVisitAvailable ? s.pricingHome : 'N/A' },
+    { key: 'clinicVisit', label: 'Clinic Visit Available', accessor: (s) => s.clinicVisitAvailable ? 'Yes' : 'No' },
+    { key: 'homeVisit', label: 'Home Visit Available', accessor: (s) => s.homeVisitAvailable ? 'Yes' : 'No' },
+    { key: 'description', label: 'Description', accessor: (s) => s.description },
+  ];
 
   return (
     <div className="w-full space-y-4">
@@ -92,10 +108,21 @@ export default function ServicesDirectoryClient({
         onSecondaryFilterChange={setOfferingFilter}
         secondaryFilterLabel="Offering"
         onExport={handleExport}
+        onCustomExport={() => setIsExportModalOpen(true)}
         actionButton={<AddServiceModal onAdd={onAdd} />}
         showViewToggle={true}
         view={view}
         onViewChange={setView}
+      />
+
+      {/* Custom Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Services Catalog CSV with Custom Values"
+        data={services}
+        availableColumns={exportColumns}
+        filename="Services_Catalog"
       />
 
       {/* Directory Content (Full Width) */}

@@ -4,7 +4,9 @@ import React, { useState, useMemo } from 'react';
 import DirectoryToolbar from './DirectoryToolbar';
 import AddTherapistModal from './AddTherapistModal';
 import EditTherapistModal from './EditTherapistModal';
+import ExportModal, { ColumnDef } from './ExportModal';
 import { exportToCsv } from '@/utils/exportCsv';
+import { useToast } from './ToastProvider';
 import { UserRound, Star, Mail, Phone, CalendarDays, GraduationCap } from 'lucide-react';
 
 interface TherapistsDirectoryClientProps {
@@ -20,9 +22,11 @@ export default function TherapistsDirectoryClient({
   onUpdate,
   onDelete,
 }: TherapistsDirectoryClientProps) {
+  const toast = useToast();
   const [search, setSearch] = useState('');
   const [expFilter, setExpFilter] = useState('all');
   const [view, setView] = useState<'table' | 'cards'>('table');
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const experienceOptions = [
     { label: '10+ Years Experience', value: '10plus' },
@@ -65,7 +69,19 @@ export default function TherapistsDirectoryClient({
       'Specializations': Array.isArray(t.specialization) ? t.specialization.join(', ') : '',
     }));
     exportToCsv('Clinic_Physiotherapists', exportRows);
+    toast.success('Export Complete', `Exported ${exportRows.length} doctors to CSV.`);
   };
+
+  const exportColumns: ColumnDef[] = [
+    { key: 'name', label: 'Practitioner Name', accessor: (t) => t.name },
+    { key: 'qualification', label: 'Qualification', accessor: (t) => t.qualification },
+    { key: 'experience', label: 'Experience (Years)', accessor: (t) => t.experience },
+    { key: 'rating', label: 'Rating Average', accessor: (t) => t.ratingAverage || 5 },
+    { key: 'mobile', label: 'Mobile Phone', accessor: (t) => t.mobile },
+    { key: 'email', label: 'Email Address', accessor: (t) => t.email },
+    { key: 'workingHours', label: 'Working Hours', accessor: (t) => `${t.workingHours?.start || '09:00'} - ${t.workingHours?.end || '19:00'}` },
+    { key: 'specializations', label: 'Specializations', accessor: (t) => Array.isArray(t.specialization) ? t.specialization.join(', ') : '' },
+  ];
 
   return (
     <div className="w-full space-y-4">
@@ -82,10 +98,21 @@ export default function TherapistsDirectoryClient({
         onFilterChange={setExpFilter}
         filterLabel="Experience"
         onExport={handleExport}
+        onCustomExport={() => setIsExportModalOpen(true)}
         actionButton={<AddTherapistModal onAdd={onAdd} />}
         showViewToggle={true}
         view={view}
         onViewChange={setView}
+      />
+
+      {/* Custom Export Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Therapists Directory CSV with Custom Values"
+        data={therapists}
+        availableColumns={exportColumns}
+        filename="Therapists_Directory"
       />
 
       {/* Directory Content (Full Width) */}

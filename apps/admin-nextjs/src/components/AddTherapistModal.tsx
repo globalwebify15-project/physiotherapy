@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Plus, X, UserRound, Camera, Loader2 } from 'lucide-react';
+import { useToast } from './ToastProvider';
 
 interface AddTherapistModalProps {
   onAdd: (formData: FormData) => Promise<void>;
@@ -10,16 +11,19 @@ interface AddTherapistModalProps {
 export default function AddTherapistModal({ onAdd }: AddTherapistModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     try {
       const formData = new FormData(e.currentTarget);
+      const name = (formData.get('name') as string) || 'Doctor';
       await onAdd(formData);
+      toast.success('Therapist Onboarded', `Dr. ${name} has been added to the medical team.`);
       setIsOpen(false);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      toast.error('Onboarding Failed', err?.message || 'Could not onboard therapist.');
     } finally {
       setLoading(false);
     }

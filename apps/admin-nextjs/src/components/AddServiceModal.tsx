@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Plus, X, Activity, Building, MapPin, Loader2 } from 'lucide-react';
+import { useToast } from './ToastProvider';
 
 interface AddServiceModalProps {
   onAdd: (formData: FormData) => Promise<void>;
@@ -10,16 +11,19 @@ interface AddServiceModalProps {
 export default function AddServiceModal({ onAdd }: AddServiceModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     try {
       const formData = new FormData(e.currentTarget);
+      const title = (formData.get('title') as string) || 'Service';
       await onAdd(formData);
+      toast.success('Service Added', `"${title}" has been successfully added to the catalog.`);
       setIsOpen(false);
-    } catch (err) {
-      console.error(err);
+    } catch (err: any) {
+      toast.error('Add Failed', err?.message || 'Could not add service.');
     } finally {
       setLoading(false);
     }

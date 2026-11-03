@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Edit3, Trash2, X, Save, AlertTriangle, Tag, Percent, IndianRupee } from 'lucide-react';
+import { useToast } from './ToastProvider';
 
 export interface OfferItem {
   id: string;
@@ -28,6 +29,7 @@ export default function EditOfferModal({
   onUpdate,
   onDelete,
 }: EditOfferModalProps) {
+  const toast = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -36,22 +38,34 @@ export default function EditOfferModal({
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    formData.append('offerId', offer.id);
-    await onUpdate(formData);
-    setLoading(false);
-    setIsOpen(false);
+    try {
+      const formData = new FormData(e.currentTarget);
+      formData.append('offerId', offer.id);
+      await onUpdate(formData);
+      toast.success('Offer Updated', `Promo code ${offer.code} modified.`);
+      setIsOpen(false);
+    } catch (err: any) {
+      toast.error('Update Failed', err?.message || 'Could not update offer.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    const formData = new FormData(e.currentTarget);
-    formData.append('offerId', offer.id);
-    await onDelete(formData);
-    setLoading(false);
-    setIsDeleting(false);
-    setIsOpen(false);
+    try {
+      const formData = new FormData(e.currentTarget);
+      formData.append('offerId', offer.id);
+      await onDelete(formData);
+      toast.success('Offer Removed', `Promo code ${offer.code} has been deleted.`);
+      setIsDeleting(false);
+      setIsOpen(false);
+    } catch (err: any) {
+      toast.error('Delete Failed', err?.message || 'Could not delete offer.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
