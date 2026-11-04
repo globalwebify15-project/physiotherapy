@@ -36,7 +36,7 @@ export default function HomePage() {
           🟢 API Server Online • v1.0.0
         </div>
         <h1 style={{ fontSize: 32, margin: "0 0 8px 0", color: "#ffffff", fontWeight: 700 }}>
-          Dr. Bariyar&apos;s Physiotherapy & Rehabilitation
+          QuickPhysio24.com
         </h1>
         <p style={{ color: "#94a3b8", fontSize: 16, margin: 0 }}>
           Backend REST API & Database Services Portal

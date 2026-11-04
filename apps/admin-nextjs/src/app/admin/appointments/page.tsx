@@ -2,6 +2,7 @@ import React from 'react';
 import { connectDB, Appointment, Therapist, Patient, Service, Notification } from 'database';
 import { revalidatePath } from 'next/cache';
 import AppointmentsDirectoryClient from '@/components/AppointmentsDirectoryClient';
+import { sendBookingConfirmationEmails } from '@/utils/mailer';
 import { Clock, CheckCircle2, UserCheck, AlertTriangle } from 'lucide-react';
 
 export const revalidate = 0; // Dynamic fetch
@@ -62,6 +63,22 @@ async function updateAppointment(formData: FormData) {
             metadata: { appointmentId: appointment._id }
           });
           console.log(`[ADMIN PORTAL NOTIFICATION] Status update notification dispatched to patient ${patient.name}`);
+        }
+
+        // Automated Email Confirmation on Confirmation or Doctor Assignment
+        if (status === 'confirmed' || therapistId) {
+          const [docTherapist, docService] = await Promise.all([
+            appointment.therapistId ? Therapist.findById(appointment.therapistId) : null,
+            appointment.serviceId ? Service.findById(appointment.serviceId) : null,
+          ]);
+
+          sendBookingConfirmationEmails({
+            appointment,
+            patient,
+            therapist: docTherapist,
+            service: docService,
+            customNote: `Appointment status updated to ${appointment.status} via Admin Portal.`,
+          }).catch((err) => console.warn('[Admin Appt Confirmation Email Error]:', err));
         }
       }
     } catch (notifErr) {

@@ -2,6 +2,7 @@ import React from 'react';
 import { connectDB, Payment, Appointment, Patient, Service } from 'database';
 import { revalidatePath } from 'next/cache';
 import { createNotification } from '@/utils/notifications';
+import { sendPaymentInvoiceEmail, sendBookingConfirmationEmails } from '@/utils/mailer';
 import { 
   CreditCard, 
   IndianRupee, 
@@ -125,6 +126,19 @@ async function sendInvoiceReceiptAction(formData: FormData) {
     }
   }
 
+  // Automated Email Invoicing to Patient + Multi-Recipient Management List
+  try {
+    await sendPaymentInvoiceEmail({
+      payment,
+      appointment: appt,
+      patient,
+      therapist: appt?.therapistId,
+      service,
+    });
+  } catch (emailErr) {
+    console.warn('[Admin Receipt Email Error]:', emailErr);
+  }
+
   revalidatePath('/admin/payments');
   revalidatePath('/admin/appointments');
 }
@@ -202,6 +216,28 @@ async function markPaidAndSendReceiptAction(formData: FormData) {
     } catch (err) {
       console.error('Error dispatching payment received alert:', err);
     }
+  }
+
+  // Automated Email Invoicing & Confirmation to Patient + Doctor + Management List
+  try {
+    await Promise.all([
+      sendPaymentInvoiceEmail({
+        payment,
+        appointment: appt,
+        patient,
+        therapist: appt?.therapistId,
+        service,
+      }),
+      sendBookingConfirmationEmails({
+        appointment: appt,
+        patient,
+        therapist: appt?.therapistId,
+        service,
+        customNote: `In-person payment of ₹${payment.amount} confirmed via ${paymentMode}.`,
+      }),
+    ]);
+  } catch (emailErr) {
+    console.warn('[Admin Mark Paid Email Error]:', emailErr);
   }
 
   revalidatePath('/admin/payments');

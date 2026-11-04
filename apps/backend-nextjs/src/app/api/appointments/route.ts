@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { connectDB, Appointment, Patient, Therapist, Service, User, Payment } from 'database';
 import { getAuthenticatedUser } from '@/utils/auth';
 import { createNotification } from '@/utils/notifications';
+import { sendBookingConfirmationEmails } from '@/utils/mailer';
 
 // GET /api/appointments - Retrieve appointments list
 // For patients: returns their own bookings.
@@ -264,6 +265,17 @@ export async function POST(request: NextRequest) {
           { appointmentId: appointment._id }
         );
       }
+
+      // Automated Multi-Recipient Email Delivery (Patient + Doctor + Multi-Admin Alert Emails)
+      sendBookingConfirmationEmails({
+        appointment: populated || appointment,
+        patient: populated?.patientId,
+        therapist: populated?.therapistId,
+        service: populated?.serviceId || service,
+        customNote: noteText,
+      }).catch((emailErr) => {
+        console.warn('[Automated Booking Email Non-Blocking Error]:', emailErr);
+      });
     } catch (notifErr) {
       console.warn('Notification dispatch failed (non-blocking):', notifErr);
     }

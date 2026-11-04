@@ -5,7 +5,7 @@ export async function GET() {
     { 
       status: 'ok', 
       uptime: process.uptime(),
-      service: 'Dr. Bariyar Physiotherapy & Rehabilitation API',
+      service: 'QuickPhysio24 API',
       timestamp: new Date().toISOString()
     },
     { 

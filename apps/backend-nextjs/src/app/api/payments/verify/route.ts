@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB, Appointment, Payment, Patient, User } from 'database';
+import { connectDB, Appointment, Payment, Patient, User, Service, Therapist } from 'database';
 import crypto from 'crypto';
 import { createNotification } from '@/utils/notifications';
+import { sendPaymentInvoiceEmail, sendBookingConfirmationEmails } from '@/utils/mailer';
 import mongoose from 'mongoose';
 
 const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || 'hk4WnpbdCMVTU28XYKntNLn2').replace(/["']/g, '').trim();
@@ -63,7 +64,11 @@ export async function POST(request: NextRequest) {
 
       // Update appointment status to confirmed
       if (payment.appointmentId) {
-        const appointment = await Appointment.findById(payment.appointmentId);
+        const appointment = await Appointment.findById(payment.appointmentId)
+          .populate('patientId')
+          .populate('therapistId')
+          .populate('serviceId');
+
         if (appointment) {
           appointment.status = 'confirmed';
           appointment.statusTimeline.push({
@@ -72,9 +77,9 @@ export async function POST(request: NextRequest) {
           });
           await appointment.save();
 
-          // Dispatch Notifications
+          // Dispatch Notifications & Automated Invoice Emails
           try {
-            const patient = await Patient.findById(appointment.patientId);
+            const patient = appointment.patientId as any;
             if (patient) {
               await createNotification(
                 patient.userId,
@@ -95,6 +100,23 @@ export async function POST(request: NextRequest) {
                 { appointmentId: appointment._id, paymentId: payment._id }
               );
             }
+
+            // Automated Email Invoicing & Confirmation to Patient + Doctor + Management
+            sendPaymentInvoiceEmail({
+              payment,
+              appointment,
+              patient,
+              therapist: appointment.therapistId,
+              service: appointment.serviceId,
+            }).catch((err) => console.warn('[Payment Invoice Email Error]:', err));
+
+            sendBookingConfirmationEmails({
+              appointment,
+              patient,
+              therapist: appointment.therapistId,
+              service: appointment.serviceId,
+              customNote: 'Payment completed online via Razorpay. Booking confirmed.',
+            }).catch((err) => console.warn('[Payment Booking Email Error]:', err));
           } catch (notifErr) {
             console.error('Failed to dispatch payment notifications:', notifErr);
           }
