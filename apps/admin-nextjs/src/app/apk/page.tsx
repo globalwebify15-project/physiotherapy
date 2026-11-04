@@ -131,7 +131,7 @@ export default function ApkDownloadPage() {
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-900 leading-tight">QuickPhysio24</h4>
-                      <span className="text-[9px] text-teal-700 font-bold">Dr. Bariyar&apos;s Clinic</span>
+                      <span className="text-[9px] text-teal-700 font-bold">QuickPhysio24.com</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5">

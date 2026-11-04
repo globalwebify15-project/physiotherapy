@@ -48,6 +48,53 @@ const SIDEBAR_ITEMS: SidebarItem[] = [
   { name: 'Download App (APK)', href: '/apk', icon: Smartphone },
 ];
 
+const ROLE_PERMISSIONS: Record<string, string[]> = {
+  superadmin: [
+    '/admin/dashboard',
+    '/admin/appointments',
+    '/admin/patients',
+    '/admin/therapists',
+    '/admin/services',
+    '/admin/payments',
+    '/admin/reviews',
+    '/admin/notifications',
+    '/admin/reports',
+    '/admin/roles',
+    '/admin/cms',
+    '/apk',
+  ],
+  admin: [
+    '/admin/dashboard',
+    '/admin/appointments',
+    '/admin/patients',
+    '/admin/therapists',
+    '/admin/services',
+    '/admin/payments',
+    '/admin/reviews',
+    '/admin/notifications',
+    '/admin/reports',
+    '/admin/cms',
+    '/apk',
+  ],
+  receptionist: [
+    '/admin/dashboard',
+    '/admin/appointments',
+    '/admin/patients',
+    '/admin/services',
+    '/admin/payments',
+    '/admin/notifications',
+    '/admin/reviews',
+    '/apk',
+  ],
+  therapist: [
+    '/admin/dashboard',
+    '/admin/appointments',
+    '/admin/patients',
+    '/admin/reviews',
+    '/apk',
+  ],
+};
+
 function getRoleDetails(role?: string) {
   switch (role) {
     case 'superadmin':
@@ -100,6 +147,9 @@ export default function AdminLayoutClient({
   const userEmail = session?.email || session?.mobile || 'admin@quickphysio24.com';
   const RoleIcon = roleMeta.icon;
 
+  const allowedHrefs = ROLE_PERMISSIONS[session?.role || 'admin'] || ROLE_PERMISSIONS.admin;
+  const filteredSidebarItems = SIDEBAR_ITEMS.filter((item) => allowedHrefs.includes(item.href));
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 flex">
       {/* Mobile Sidebar Toggle Button */}
@@ -135,7 +185,7 @@ export default function AdminLayoutClient({
 
         {/* Scrollable Navigation Area (Internal scroll only) */}
         <nav className="flex-1 overflow-y-auto py-5 px-3.5 space-y-1.5 custom-scrollbar">
-          {SIDEBAR_ITEMS.map((item) => {
+          {filteredSidebarItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
             return (

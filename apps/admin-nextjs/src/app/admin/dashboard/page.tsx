@@ -13,15 +13,22 @@ import {
   Sparkles,
   MapPin,
   Building,
-  UserCheck
+  UserCheck,
+  ShieldAlert
 } from 'lucide-react';
 import Link from 'next/link';
 import DashboardCharts from '@/components/DashboardCharts';
 
 export const revalidate = 0; // Live dynamic fetch
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ denied?: string }>;
+}) {
   await connectDB();
+  const params = searchParams ? await searchParams : {};
+  const deniedReason = params.denied;
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -116,7 +123,24 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      
+      {deniedReason && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
+              <ShieldAlert size={20} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-amber-900">Security: Access Restricted (RBAC Policy)</h4>
+              <p className="text-xs text-amber-800 mt-0.5">
+                {deniedReason === 'superadmin_only'
+                  ? 'The Staff & Roles (RBAC) management module strictly requires Super Administrator credentials.'
+                  : 'Your assigned staff role does not have authorization to view or modify that operational section.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Visual Hero Welcome Banner matching mobile APK Teal/Emerald aesthetic */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-950 via-teal-800 to-emerald-900 p-7 lg:p-9 text-white shadow-xl shadow-teal-950/20 border border-teal-700/30">
         
@@ -132,7 +156,7 @@ export default async function DashboardPage() {
             </div>
             
             <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white leading-tight">
-              Dr. Bariyar&apos;s Physiotherapy Dashboard
+              QuickPhysio24 Operations Dashboard
             </h1>
             
             <p className="text-teal-100/90 font-medium text-xs lg:text-sm leading-relaxed">

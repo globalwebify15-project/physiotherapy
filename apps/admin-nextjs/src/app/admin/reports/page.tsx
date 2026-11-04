@@ -1,11 +1,18 @@
 import React from 'react';
 import { connectDB, Payment, Appointment, Patient, Therapist, Service, User } from 'database';
+import { redirect } from 'next/navigation';
+import { getAdminSession } from '@/utils/auth';
 import { IndianRupee, CalendarCheck, Users } from 'lucide-react';
 import ReportsDirectoryClient from '@/components/ReportsDirectoryClient';
 
 export const revalidate = 0; // Dynamic fetch
 
 export default async function ReportsPage() {
+  const session = await getAdminSession();
+  if (session?.role !== 'superadmin' && session?.role !== 'admin') {
+    redirect('/admin/dashboard?denied=admin_only');
+  }
+
   await connectDB();
 
   // Concurrently fetch all report streams using optimized aggregation and lean queries

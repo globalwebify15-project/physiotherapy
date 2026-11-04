@@ -3,6 +3,7 @@ import { connectDB, User } from 'database';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
+import { getAdminSession } from '@/utils/auth';
 import StaffDirectoryClient from '@/components/StaffDirectoryClient';
 import { 
   ShieldCheck, 
@@ -18,6 +19,11 @@ export const revalidate = 0; // Dynamic real-time fetch
 // Server Action: Create new clinic staff account or promote existing account
 async function createStaffAction(formData: FormData) {
   'use server';
+  const session = await getAdminSession();
+  if (session?.role !== 'superadmin') {
+    redirect('/admin/dashboard?denied=superadmin_only');
+  }
+
   const email = (formData.get('email') as string)?.trim().toLowerCase();
   let mobile = (formData.get('mobile') as string)?.trim() || '';
   const password = formData.get('password') as string;
@@ -66,6 +72,11 @@ async function createStaffAction(formData: FormData) {
 // Server Action: Update user role or toggle status
 async function updateStaffAction(formData: FormData) {
   'use server';
+  const session = await getAdminSession();
+  if (session?.role !== 'superadmin') {
+    redirect('/admin/dashboard?denied=superadmin_only');
+  }
+
   const userId = formData.get('userId') as string;
   const actionType = formData.get('actionType') as string;
   const newRole = formData.get('newRole') as string;
@@ -91,6 +102,11 @@ export default async function RolesPage({
 }: {
   searchParams?: Promise<{ success?: string; error?: string }>;
 }) {
+  const session = await getAdminSession();
+  if (session?.role !== 'superadmin') {
+    redirect('/admin/dashboard?denied=superadmin_only');
+  }
+
   await connectDB();
 
   const params = searchParams ? await searchParams : {};

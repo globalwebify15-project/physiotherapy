@@ -1,6 +1,8 @@
 import React from 'react';
 import { connectDB, CMS } from 'database';
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { getAdminSession } from '@/utils/auth';
 import EditFaqModal from '@/components/EditFaqModal';
 import EditOfferModal from '@/components/EditOfferModal';
 import CmsSubmitButton from '@/components/CmsSubmitButton';
@@ -531,6 +533,11 @@ async function resetDefaultOffersAction() {
 }
 
 export default async function CMSPage() {
+  const session = await getAdminSession();
+  if (session?.role !== 'superadmin' && session?.role !== 'admin') {
+    redirect('/admin/dashboard?denied=admin_only');
+  }
+
   await connectDB();
 
   // 1. Load Contact Details
