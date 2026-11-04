@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Dr. Bariyar's Physiotherapy & Rehabilitation API",
-  description: "Backend API and services portal for Dr. Bariyar's Physiotherapy & Rehabilitation",
+  title: "QuickPhysio24.com API",
+  description: "Backend API and services portal for QuickPhysio24.com",
 };
 
 export default function RootLayout({

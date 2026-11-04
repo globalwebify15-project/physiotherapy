@@ -540,9 +540,9 @@ export default async function CMSPage() {
     whatsapp: '+91 96932 33447',
     drRajnishPhone: '+91 91109 12544',
     drPriyankaPhone: '+91 96932 33447',
-    email: 'contact@drbariyarphysio.com',
+    email: 'contact@quickphysio24.com',
     address: 'Near, Ashok Nagar Rd No 1, opposite Overhead Water Tank, Ashok Nagar, Ranchi, Jharkhand 834002',
-    website: 'https://drbariyarphysio.com',
+    website: 'https://quickphysio24.com',
     workingHours: '9:00 AM – 7:00 PM (Monday – Sunday)'
   };
 
@@ -563,7 +563,7 @@ export default async function CMSPage() {
   // 3. Load About Clinic Story
   const aboutCMS = await CMS.findOne({ key: 'about_clinic' });
   const about = aboutCMS?.content || {
-    clinicHeadline: "Dr. Bariyar's Physiotherapy & Rehabilitation Center",
+    clinicHeadline: "QuickPhysio24.com",
     clinicBio: "Leading physiotherapy & neuro-rehabilitation clinic in Ranchi, Jharkhand specializing in Stroke paralysis, Cervical & Lumbar Spondylosis, Joint replacements, Pediatric CP rehabilitation, and Sports Injury recovery.",
     yearsExperience: '16+ Years',
     patientsTreated: '15,000+',

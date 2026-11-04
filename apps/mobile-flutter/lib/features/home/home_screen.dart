@@ -1252,6 +1252,127 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           ),
                           const SizedBox(height: 28),
 
+                          // Patient Reviews & Ratings Spotlight Section
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.all(18),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(22),
+                              border: Border.all(color: const Color(0xFFF1F5F9)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.02),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
+                                )
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(7),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(10),
+                                          ),
+                                          child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 18),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: const [
+                                            Text(
+                                              'Patient Reviews & Stories',
+                                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                            ),
+                                            Text(
+                                              '4.9 ★ Rating • 350+ Clinical Cases',
+                                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                    TextButton(
+                                      onPressed: () => context.push('/reviews'),
+                                      child: const Text('See All →', style: TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold, fontSize: 12)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF8FAFC),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          const Text(
+                                            'Sunil Verma (Stroke Rehab)',
+                                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF0F172A)),
+                                          ),
+                                          Row(
+                                            children: List.generate(5, (_) => const Icon(Icons.star_rounded, color: Colors.amber, size: 14)),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 4),
+                                      const Text(
+                                        '"Tremendous improvement in walking mobility within 3 weeks of neuro-rehabilitation at QuickPhysio24.com."',
+                                        style: TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.3),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () => context.push('/reviews'),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(0xFF0F766E),
+                                          side: const BorderSide(color: Color(0xFF0F766E)),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                        ),
+                                        child: const Text('View All Reviews (4.9 ★)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        onPressed: () => context.push('/reviews'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF0F766E),
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          padding: const EdgeInsets.symmetric(vertical: 8),
+                                        ),
+                                        child: const Text('Write a Review', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 28),
+
                           // Frequently Asked Questions Section (Dynamic from CMS)
                           FaqSection(customFaqs: _faqs.isNotEmpty ? _faqs : null),
                           const SizedBox(height: 48),

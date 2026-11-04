@@ -16,7 +16,7 @@ class PhoneHelper {
   static String physicalAddress = 'Near, Ashok Nagar Rd No 1, opposite Overhead Water Tank, Ashok Nagar, Ranchi, Jharkhand 834002';
 
   // Live Active About Clinic details from CMS
-  static String clinicHeadline = "Dr. Bariyar's Physiotherapy & Rehabilitation Center";
+  static String clinicHeadline = "QuickPhysio24.com";
   static String clinicBio = "Leading physiotherapy & neuro-rehabilitation clinic in Ranchi, Jharkhand specializing in Stroke paralysis, Cervical & Lumbar Spondylosis, Joint replacements, Pediatric CP rehabilitation, and Sports Injury recovery.";
   static String clinicalExperience = "16+ Years";
   static String treatedPatients = "15,000+";

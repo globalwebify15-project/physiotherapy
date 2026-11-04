@@ -15,6 +15,7 @@ import 'features/home/profile_screen.dart';
 import 'features/settings/settings_screen.dart';
 import 'features/settings/about_clinic_screen.dart';
 import 'features/settings/contact_us_screen.dart';
+import 'features/reviews/reviews_screen.dart';
 import 'features/settings/theme_provider.dart';
 import 'features/auth/register_screen.dart';
 import 'services/notification_service.dart';
@@ -150,6 +151,10 @@ class PhysioApp extends ConsumerWidget {
         GoRoute(
           path: '/contact_us',
           builder: (context, state) => const ContactUsScreen(),
+        ),
+        GoRoute(
+          path: '/reviews',
+          builder: (context, state) => const ReviewsScreen(),
         ),
         GoRoute(
           path: '/register',

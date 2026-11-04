@@ -657,7 +657,7 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
                         Text(
-                          'Dr. Bariyar\'s Physiotherapy',
+                          'QuickPhysio24.com',
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
                         ),
                         SizedBox(height: 2),

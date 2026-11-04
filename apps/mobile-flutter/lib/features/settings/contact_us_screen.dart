@@ -132,7 +132,7 @@ class _ContactUsScreenState extends State<ContactUsScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
-                                    "Dr. Bariyar's Physiotherapy Center",
+                                    "QuickPhysio24.com",
                                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: slateDark),
                                   ),
                                   const SizedBox(height: 6),

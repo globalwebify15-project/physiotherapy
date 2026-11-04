@@ -305,6 +305,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
 
+                  // Patient Reviews & Ratings Tile
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: ListTile(
+                      onTap: () => context.push('/reviews'),
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFFEF3C7),
+                        child: Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 22),
+                      ),
+                      title: const Text(
+                        'Patient Reviews & Ratings',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      subtitle: const Text(
+                        '4.9 ★ • View verified feedback or rate clinic',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+
                   // 2. Calling & WhatsApp Support Channels (Live CMS)
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
@@ -329,6 +355,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
+                    ),
+                  ),
+
+                  // Patient Reviews & Ratings Tile
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: ListTile(
+                      onTap: () => context.push('/reviews'),
+                      leading: const CircleAvatar(
+                        backgroundColor: Color(0xFFFEF3C7),
+                        child: Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 22),
+                      ),
+                      title: const Text(
+                        'Patient Reviews & Ratings',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                      ),
+                      subtitle: const Text(
+                        '4.9 ★ • View verified feedback or rate clinic',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                       ),
                       trailing: const Icon(Icons.chevron_right_rounded, color: Color(0xFF94A3B8)),
                     ),

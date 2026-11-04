@@ -43,7 +43,7 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
       'id': 'dr_rajnish',
       'name': 'Dr. Rajnish Bariyar',
       'qualification': 'BPT, MIAP, JSCPT',
-      'designation': "Founder & Chief Physiotherapist of Dr. Bariyar's Physiotherapy & Rehabilitation\nJoint Secretary, IAP (Jharkhand Branch)",
+      'designation': "Founder & Chief Physiotherapist at QuickPhysio24.com\nJoint Secretary, IAP (Jharkhand Branch)",
       'shortRole': 'Founder & Chief Physiotherapist',
       'experience': '16+ Years Experience',
       'hours': '9:00 AM – 7:00 PM',
@@ -70,7 +70,7 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
       'id': 'dr_priyanka',
       'name': 'Dr. Priyanka Bariyar',
       'qualification': 'BPT, MIAP, JSCPT',
-      'designation': "Co- Founder & Director of Dr. Bariyar's Physiotherapy & Neuro Rehabilitation",
+      'designation': "Co-Founder & Director of QuickPhysio24.com",
       'shortRole': 'Co-Founder & Director',
       'experience': '14+ Years Experience',
       'hours': '9:00 AM – 7:00 PM',
@@ -141,9 +141,9 @@ class _ServiceProvidersScreenState extends State<ServiceProvidersScreen> {
                 'name': name,
                 'qualification': qual,
                 'designation': isRajnish
-                    ? "Founder & Chief Physiotherapist of Dr. Bariyar's Physiotherapy & Rehabilitation\nJoint Secretary, IAP (Jharkhand Branch)"
+                    ? "Founder & Chief Physiotherapist at QuickPhysio24.com\nJoint Secretary, IAP (Jharkhand Branch)"
                     : (isPriyanka
-                        ? "Co- Founder & Director of Dr. Bariyar's Physiotherapy & Neuro Rehabilitation"
+                        ? "Co-Founder & Director of QuickPhysio24.com"
                         : "Consultant Physiotherapist at QuickPhysio24.com"),
                 'shortRole': isRajnish
                     ? 'Founder & Chief Physiotherapist'

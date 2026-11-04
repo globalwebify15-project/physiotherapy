@@ -602,7 +602,7 @@ export default function PaymentsDirectoryClient({
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-black text-sm">QP</span>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight">Dr. Bariyar's Physiotherapy & Rehabilitation Center</h2>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">QuickPhysio24.com</h2>
                   </div>
                   <p className="text-xs text-teal-700 font-bold mt-1">
                     MIAP Certified • JSCPT Registered • Government Recognized Center
