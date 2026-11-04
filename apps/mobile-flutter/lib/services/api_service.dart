@@ -508,9 +508,48 @@ class ApiService {
             await _saveUserAppointments(cleanMobile, existing);
           }
         }
+        if ((res.statusCode == 200 || res.statusCode == 201) && path.startsWith('/reviews') && data is Map) {
+          try {
+            final raw = await _storage.read(key: 'local_patient_reviews');
+            List<dynamic> list = raw != null && raw.isNotEmpty ? jsonDecode(raw) : [];
+            list.insert(0, {
+              'name': data['patientName'] ?? 'Verified Patient',
+              'rating': data['rating'] ?? 5,
+              'date': 'Just now',
+              'treatment': data['treatment'] ?? 'Verified Care',
+              'visitType': 'Verified Patient Review',
+              'comment': data['comment'] ?? '',
+              'doctor': 'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar',
+              'isVerified': true,
+            });
+            await _storage.write(key: 'local_patient_reviews', value: jsonEncode(list));
+          } catch (_) {}
+        }
         return res;
       } catch (e) {
         print('[ApiService Live POST Failed, Falling back to local offline cache]: $e');
+        if (path.startsWith('/reviews') && data is Map) {
+          try {
+            final raw = await _storage.read(key: 'local_patient_reviews');
+            List<dynamic> list = raw != null && raw.isNotEmpty ? jsonDecode(raw) : [];
+            list.insert(0, {
+              'name': data['patientName'] ?? 'Verified Patient',
+              'rating': data['rating'] ?? 5,
+              'date': 'Just now',
+              'treatment': data['treatment'] ?? 'Verified Care',
+              'visitType': 'Verified Patient Review',
+              'comment': data['comment'] ?? '',
+              'doctor': 'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar',
+              'isVerified': true,
+            });
+            await _storage.write(key: 'local_patient_reviews', value: jsonEncode(list));
+          } catch (_) {}
+          return Response(
+            requestOptions: RequestOptions(path: path),
+            statusCode: 201,
+            data: {'success': true, 'message': 'Review cached locally'},
+          );
+        }
       }
     }
 

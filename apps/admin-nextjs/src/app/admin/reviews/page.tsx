@@ -24,6 +24,17 @@ async function toggleReviewModeration(formData: FormData) {
   revalidatePath('/admin/reviews');
 }
 
+// Server Action to delete inappropriate review
+async function deleteReviewAction(formData: FormData) {
+  'use server';
+  const reviewId = formData.get('reviewId') as string;
+  if (!reviewId) return;
+
+  await connectDB();
+  await Review.findByIdAndDelete(reviewId);
+  revalidatePath('/admin/reviews');
+}
+
 export default async function ReviewsPage() {
   await connectDB();
 
@@ -103,6 +114,7 @@ export default async function ReviewsPage() {
         <ReviewsDirectoryClient
           reviews={JSON.parse(JSON.stringify(reviews))}
           toggleReviewModeration={toggleReviewModeration}
+          deleteReviewAction={deleteReviewAction}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../widgets/app_header.dart';
 import '../../widgets/app_bottom_nav.dart';
@@ -841,14 +842,27 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Official Invoice & Receipt saved to device downloads!'),
-                            backgroundColor: Color(0xFF0F766E),
-                          ),
-                        );
+                      onPressed: () async {
+                        final apptId = (appt['_id'] ?? '').toString();
+                        final downloadUrl = 'https://physiotherapy-backend-nextjs.vercel.app/api/invoice?id=$apptId&download=true';
+                        try {
+                          final uri = Uri.parse(downloadUrl);
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          if (ctx.mounted) {
+                            Navigator.pop(ctx);
+                          }
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Downloading QuickPhysio24.com Official Invoice to device...'),
+                                backgroundColor: Color(0xFF0F766E),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          final fallbackUri = Uri.parse('https://physiotherapy-backend-nextjs.vercel.app/api/invoice?id=$apptId');
+                          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+                        }
                       },
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text('Download / Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),

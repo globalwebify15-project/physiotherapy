@@ -11,17 +11,20 @@ import {
   EyeOff, 
   User, 
   Calendar,
-  Sparkles
+  Sparkles,
+  Trash2
 } from 'lucide-react';
 
 interface ReviewsDirectoryClientProps {
   reviews: any[];
   toggleReviewModeration: (formData: FormData) => Promise<void>;
+  deleteReviewAction?: (formData: FormData) => Promise<void>;
 }
 
 export default function ReviewsDirectoryClient({
   reviews,
   toggleReviewModeration,
+  deleteReviewAction,
 }: ReviewsDirectoryClientProps) {
   const toast = useToast();
   const [search, setSearch] = useState('');
@@ -85,6 +88,19 @@ export default function ReviewsDirectoryClient({
       );
     } catch (err: any) {
       toast.error('Action Failed', err?.message || 'Could not update review status.');
+    }
+  };
+
+  const handleDeleteReview = async (reviewId: string) => {
+    if (!deleteReviewAction) return;
+    if (!window.confirm('Are you sure you want to permanently delete this review?')) return;
+    try {
+      const fd = new FormData();
+      fd.append('reviewId', reviewId);
+      await deleteReviewAction(fd);
+      toast.success('Review Deleted', 'Patient review has been removed.');
+    } catch (err: any) {
+      toast.error('Delete Failed', err?.message || 'Could not delete review.');
     }
   };
 
@@ -200,34 +216,47 @@ export default function ReviewsDirectoryClient({
                           </span>
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <form
-                            action={async (fd) => {
-                              await handleToggleModeration(fd, !rev.isModerated);
-                            }}
-                            className="inline-block"
-                          >
-                            <input type="hidden" name="reviewId" value={rev._id.toString()} />
-                            <input type="hidden" name="currentStatus" value={rev.isModerated ? 'true' : 'false'} />
-                            {rev.isModerated ? (
-                              <button 
-                                type="submit" 
-                                title="Hide from public"
-                                className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
+                          <div className="flex items-center justify-end gap-1.5">
+                            <form
+                              action={async (fd) => {
+                                await handleToggleModeration(fd, !rev.isModerated);
+                              }}
+                              className="inline-block"
+                            >
+                              <input type="hidden" name="reviewId" value={rev._id.toString()} />
+                              <input type="hidden" name="currentStatus" value={rev.isModerated ? 'true' : 'false'} />
+                              {rev.isModerated ? (
+                                <button 
+                                  type="submit" 
+                                  title="Hide from public"
+                                  className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
+                                >
+                                  <EyeOff size={11} />
+                                  Unpublish
+                                </button>
+                              ) : (
+                                <button 
+                                  type="submit" 
+                                  title="Publish review"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
+                                >
+                                  <CheckCircle size={11} />
+                                  Publish
+                                </button>
+                              )}
+                            </form>
+
+                            {deleteReviewAction && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteReview(rev._id.toString())}
+                                title="Delete review permanently"
+                                className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
                               >
-                                <EyeOff size={11} />
-                                Unpublish
-                              </button>
-                            ) : (
-                              <button 
-                                type="submit" 
-                                title="Publish review"
-                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1 transition-colors shadow-2xs cursor-pointer"
-                              >
-                                <CheckCircle size={11} />
-                                Publish
+                                <Trash2 size={11} />
                               </button>
                             )}
-                          </form>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -302,31 +331,44 @@ export default function ReviewsDirectoryClient({
                       {rev.isModerated ? 'Published' : 'Under Review'}
                     </span>
 
-                    <form
-                      action={async (fd) => {
-                        await handleToggleModeration(fd, !rev.isModerated);
-                      }}
-                    >
-                      <input type="hidden" name="reviewId" value={rev._id.toString()} />
-                      <input type="hidden" name="currentStatus" value={rev.isModerated ? 'true' : 'false'} />
-                      {rev.isModerated ? (
-                        <button 
-                          type="submit" 
-                          className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                    <div className="flex items-center gap-1.5">
+                      <form
+                        action={async (fd) => {
+                          await handleToggleModeration(fd, !rev.isModerated);
+                        }}
+                      >
+                        <input type="hidden" name="reviewId" value={rev._id.toString()} />
+                        <input type="hidden" name="currentStatus" value={rev.isModerated ? 'true' : 'false'} />
+                        {rev.isModerated ? (
+                          <button 
+                            type="submit" 
+                            className="bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer"
+                          >
+                            <EyeOff size={13} />
+                            Unpublish
+                          </button>
+                        ) : (
+                          <button 
+                            type="submit" 
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+                          >
+                            <CheckCircle size={13} />
+                            Approve & Publish
+                          </button>
+                        )}
+                      </form>
+
+                      {deleteReviewAction && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteReview(rev._id.toString())}
+                          title="Delete review"
+                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 text-xs font-bold p-1.5 rounded-xl flex items-center transition-colors cursor-pointer"
                         >
-                          <EyeOff size={13} />
-                          Unpublish
-                        </button>
-                      ) : (
-                        <button 
-                          type="submit" 
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
-                        >
-                          <CheckCircle size={13} />
-                          Approve & Publish
+                          <Trash2 size={13} />
                         </button>
                       )}
-                    </form>
+                    </div>
                   </div>
                 </div>
               );

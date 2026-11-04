@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
 
@@ -11,6 +13,7 @@ class ReviewsScreen extends StatefulWidget {
 
 class _ReviewsScreenState extends State<ReviewsScreen> {
   final ApiService _apiService = ApiService();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage();
   bool _isLoading = true;
   List<Map<String, dynamic>> _reviews = [];
   String _selectedFilter = 'All';
@@ -80,51 +83,83 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
     _fetchReviews();
   }
 
+  Future<List<Map<String, dynamic>>> _loadLocalReviews() async {
+    try {
+      final raw = await _storage.read(key: 'local_patient_reviews');
+      if (raw != null && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          return List<Map<String, dynamic>>.from(decoded);
+        }
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _saveLocalReview(Map<String, dynamic> rev) async {
+    try {
+      final current = await _loadLocalReviews();
+      current.insert(0, rev);
+      await _storage.write(key: 'local_patient_reviews', value: jsonEncode(current));
+    } catch (_) {}
+  }
+
   Future<void> _fetchReviews() async {
+    final List<Map<String, dynamic>> localReviews = await _loadLocalReviews();
     try {
       final res = await _apiService.get('/reviews');
       if (res.statusCode == 200 && res.data != null) {
         final List<dynamic> raw = res.data['reviews'] is List ? res.data['reviews'] : [];
-        if (raw.isNotEmpty) {
-          final List<Map<String, dynamic>> parsed = [];
-          for (final item in raw) {
-            if (item is Map) {
-              final patient = item['patientId'];
-              final patientName = patient is Map && patient['name'] != null ? patient['name'].toString() : 'Verified Patient';
-              final service = item['serviceId'];
-              final serviceTitle = service is Map && service['title'] != null ? service['title'].toString() : 'General Physiotherapy';
-              final therapist = item['therapistId'];
-              final doctorName = therapist is Map && therapist['name'] != null ? therapist['name'].toString() : 'Specialist Doctor';
+        final List<Map<String, dynamic>> parsed = [];
+        for (final item in raw) {
+          if (item is Map) {
+            final patient = item['patientId'];
+            final patientName = patient is Map && patient['name'] != null ? patient['name'].toString() : 'Verified Patient';
+            final service = item['serviceId'];
+            final serviceTitle = service is Map && service['title'] != null ? service['title'].toString() : 'General Physiotherapy';
+            final therapist = item['therapistId'];
+            final doctorName = therapist is Map && therapist['name'] != null ? therapist['name'].toString() : 'Dr. Rajnish Bariyar';
 
-              parsed.add({
-                'name': patientName,
-                'rating': (item['rating'] as num?)?.toInt() ?? 5,
-                'date': item['createdAt'] != null ? item['createdAt'].toString().substring(0, 10) : 'Recent',
-                'treatment': serviceTitle,
-                'visitType': 'Verified Visit',
-                'comment': (item['comment'] ?? '').toString(),
-                'doctor': doctorName,
-                'isVerified': true,
-              });
-            }
-          }
-          if (parsed.isNotEmpty) {
-            setState(() {
-              _reviews = [...parsed, ..._seedReviews];
-              _isLoading = false;
+            parsed.add({
+              'name': patientName,
+              'rating': (item['rating'] as num?)?.toInt() ?? 5,
+              'date': item['createdAt'] != null ? item['createdAt'].toString().substring(0, 10) : 'Recent',
+              'treatment': serviceTitle,
+              'visitType': 'Verified Care',
+              'comment': (item['comment'] ?? '').toString(),
+              'doctor': doctorName,
+              'isVerified': true,
             });
-            return;
           }
+        }
+
+        // Combine local reviews (user's own reviews), server reviews, and seed reviews
+        final Set<String> seenComments = {};
+        final List<Map<String, dynamic>> combined = [];
+
+        for (final r in [...localReviews, ...parsed, ..._seedReviews]) {
+          final c = (r['comment'] ?? '').toString().trim();
+          if (c.isNotEmpty && !seenComments.contains(c)) {
+            seenComments.add(c);
+            combined.add(r);
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _reviews = combined;
+            _isLoading = false;
+          });
+          return;
         }
       }
     } catch (e) {
       debugPrint('[Reviews Fetch Notice]: $e');
     }
 
-    // Default to seed reviews
     if (mounted) {
       setState(() {
-        _reviews = _seedReviews;
+        _reviews = [...localReviews, ..._seedReviews];
         _isLoading = false;
       });
     }
@@ -340,30 +375,40 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                               }
 
                               setModalState(() => isSubmitting = true);
+                              final currentName = await _storage.read(key: 'patientName') ?? 'Verified Patient';
+                              final currentMobile = await _storage.read(key: 'userMobile') ?? '';
+
+                              final newReview = {
+                                'name': currentName.isNotEmpty ? currentName : 'Verified Patient',
+                                'rating': selectedRating,
+                                'date': 'Just now',
+                                'treatment': selectedTreatment,
+                                'visitType': 'Verified Patient Review',
+                                'comment': text,
+                                'doctor': 'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar',
+                                'isVerified': true,
+                              };
+
                               try {
                                 await _apiService.post('/reviews', data: {
                                   'rating': selectedRating,
                                   'comment': text,
+                                  'treatment': selectedTreatment,
+                                  'patientName': currentName.isNotEmpty ? currentName : 'Verified Patient',
+                                  'patientMobile': currentMobile,
                                 });
                               } catch (e) {
                                 debugPrint('[Review Submit Notice]: $e');
                               }
 
-                              // Optimistic UI update
-                              setState(() {
-                                _reviews.insert(0, {
-                                  'name': 'You (Verified Patient)',
-                                  'rating': selectedRating,
-                                  'date': 'Just now',
-                                  'treatment': selectedTreatment,
-                                  'visitType': 'Verified Care',
-                                  'comment': text,
-                                  'doctor': 'Dr. Rajnish Bariyar & Clinical Team',
-                                  'isVerified': true,
-                                });
-                              });
+                              // Always save to persistent device cache
+                              await _saveLocalReview(newReview);
 
                               if (mounted) {
+                                setState(() {
+                                  _reviews.removeWhere((r) => r['comment'] == text);
+                                  _reviews.insert(0, newReview);
+                                });
                                 Navigator.pop(modalCtx);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
@@ -372,6 +417,9 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                                   ),
                                 );
                               }
+
+                              // Trigger background refresh to sync with live DB
+                              _fetchReviews();
                             },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF0F766E),
