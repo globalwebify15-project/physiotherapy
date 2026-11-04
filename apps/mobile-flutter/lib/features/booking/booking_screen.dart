@@ -123,8 +123,21 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
-  void _handlePaymentError(PaymentFailureResponse response) {
+  void _handlePaymentError(PaymentFailureResponse response) async {
     debugPrint('[Razorpay Error Code]: ${response.code}, message: ${response.message}');
+    final failedApptId = _pendingAppointmentId;
+    _pendingAppointmentId = null;
+    _pendingPaymentId = null;
+    _pendingOrderId = null;
+
+    if (failedApptId != null && failedApptId.isNotEmpty) {
+      try {
+        await _apiService.delete('/appointments/$failedApptId');
+      } catch (e) {
+        debugPrint('[Discard Pending Appointment Error]: $e');
+      }
+    }
+
     if (mounted) {
       setState(() => _isBookingSubmitting = false);
       final errMsg = (response.message != null && response.message!.isNotEmpty && response.message != 'null')
@@ -132,8 +145,9 @@ class _BookingScreenState extends State<BookingScreen> {
           : 'Payment cancelled or dismissed';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Payment: $errMsg'),
+          content: Text('Payment not completed ($errMsg). Appointment was not booked. You can retry or choose Pay at Clinic/Home.'),
           backgroundColor: const Color(0xFFEF4444),
+          duration: const Duration(seconds: 4),
         ),
       );
     }
@@ -610,7 +624,13 @@ class _BookingScreenState extends State<BookingScreen> {
               },
               'theme': {
                 'color': '#0F766E',
-              }
+              },
+              'method': {
+                'netbanking': true,
+                'card': true,
+                'upi': true,
+                'wallet': true,
+              },
             };
 
             if (isRealRazorpayOrder) {
@@ -635,13 +655,15 @@ class _BookingScreenState extends State<BookingScreen> {
         }
       }
 
-      // If Cash on Visit (or direct confirmation):
+      // If Cash / Pay at Clinic or Home Visit:
       if (mounted) {
         setState(() => _isBookingSubmitting = false);
+        final payLoc = _selectedVisitType == 'home' ? 'at Home on arrival' : 'at Clinic reception';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Appointment for ${selectedService['title']} Confirmed!'),
+            content: Text('Appointment requested for ${selectedService['title']}! Payment pending ($payLoc).'),
             backgroundColor: const Color(0xFF0F766E),
+            duration: const Duration(seconds: 4),
           ),
         );
         context.go('/appointments');
@@ -824,7 +846,12 @@ class _BookingScreenState extends State<BookingScreen> {
                                 title: 'Clinic Visit',
                                 icon: Icons.local_hospital_rounded,
                                 isSelected: _selectedVisitType == 'clinic',
-                                onTap: () => setState(() => _selectedVisitType = 'clinic'),
+                                onTap: () => setState(() {
+                                  _selectedVisitType = 'clinic';
+                                  if (_selectedPaymentMethod == 'home') {
+                                    _selectedPaymentMethod = 'clinic';
+                                  }
+                                }),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -833,7 +860,12 @@ class _BookingScreenState extends State<BookingScreen> {
                                 title: 'Home Visit',
                                 icon: Icons.home_rounded,
                                 isSelected: _selectedVisitType == 'home',
-                                onTap: () => setState(() => _selectedVisitType = 'home'),
+                                onTap: () => setState(() {
+                                  _selectedVisitType = 'home';
+                                  if (_selectedPaymentMethod == 'clinic') {
+                                    _selectedPaymentMethod = 'home';
+                                  }
+                                }),
                               ),
                             ),
                           ],
@@ -1039,11 +1071,19 @@ class _BookingScreenState extends State<BookingScreen> {
                             const SizedBox(width: 10),
                             Expanded(
                               child: _buildPaymentOptionCard(
-                                title: 'Pay at Clinic\n(Cash / Card on Visit)',
-                                subtitle: 'Pay when attending session',
-                                icon: Icons.storefront_rounded,
-                                isSelected: _selectedPaymentMethod == 'clinic',
-                                onTap: () => setState(() => _selectedPaymentMethod = 'clinic'),
+                                title: _selectedVisitType == 'home'
+                                    ? 'Pay at Home\n(Cash / UPI on Visit)'
+                                    : 'Pay at Clinic\n(Cash / UPI on Visit)',
+                                subtitle: _selectedVisitType == 'home'
+                                    ? 'Pay therapist on arrival'
+                                    : 'Pay at reception desk',
+                                icon: _selectedVisitType == 'home'
+                                    ? Icons.home_work_rounded
+                                    : Icons.storefront_rounded,
+                                isSelected: _selectedPaymentMethod == (_selectedVisitType == 'home' ? 'home' : 'clinic'),
+                                onTap: () => setState(() {
+                                  _selectedPaymentMethod = _selectedVisitType == 'home' ? 'home' : 'clinic';
+                                }),
                               ),
                             ),
                           ],
@@ -1273,9 +1313,14 @@ class _BookingScreenState extends State<BookingScreen> {
                                   width: 22,
                                   child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                                 )
-                              : const Text(
-                                  'Confirm Appointment / बुक करें',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                              : Text(
+                                  _selectedPaymentMethod == 'online'
+                                      ? 'Pay ₹${_getTotalPayable().toStringAsFixed(0)} & Book Appointment'
+                                      : _selectedVisitType == 'home'
+                                          ? 'Confirm Home Visit (Pay ₹${_getTotalPayable().toStringAsFixed(0)} at Home)'
+                                          : 'Confirm Clinic Visit (Pay ₹${_getTotalPayable().toStringAsFixed(0)} at Clinic)',
+                                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                                  textAlign: TextAlign.center,
                                 ),
                         ),
                         const SizedBox(height: 36),

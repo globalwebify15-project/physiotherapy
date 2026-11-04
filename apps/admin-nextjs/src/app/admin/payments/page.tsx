@@ -1,6 +1,7 @@
 import React from 'react';
 import { connectDB, Payment, Appointment, Patient, Service } from 'database';
 import { revalidatePath } from 'next/cache';
+import { createNotification } from '@/utils/notifications';
 import { 
   CreditCard, 
   IndianRupee, 
@@ -45,10 +46,166 @@ async function processRefundAction(formData: FormData) {
         timestamp: new Date(),
       });
       await appt.save();
+
+      // Notify patient of processed refund
+      try {
+        const patient = await Patient.findById(appt.patientId);
+        if (patient?.userId) {
+          await createNotification(
+            patient.userId,
+            `Refund Processed (₹${payment.amount})`,
+            `A refund of ₹${payment.amount} has been approved and issued to your original payment method.`,
+            'payment_alert',
+            { paymentId: payment._id.toString(), appointmentId: appt._id.toString() }
+          );
+        }
+      } catch (err) {
+        console.error('Notification error on refund:', err);
+      }
     }
   }
 
   revalidatePath('/admin/payments');
+  revalidatePath('/admin/appointments');
+}
+
+// Server Action: Send Official Invoice & Clinical Receipt to Patient
+async function sendInvoiceReceiptAction(formData: FormData) {
+  'use server';
+  const paymentId = formData.get('paymentId') as string;
+  if (!paymentId) return;
+
+  await connectDB();
+  const payment = await Payment.findById(paymentId).populate({
+    path: 'appointmentId',
+    model: Appointment,
+    populate: [
+      { path: 'patientId', model: Patient },
+      { path: 'serviceId', model: Service }
+    ]
+  });
+
+  if (!payment) return;
+
+  const appt = payment.appointmentId as any;
+  const patient = appt?.patientId;
+  const service = appt?.serviceId;
+  const serviceTitle = service?.title || 'Physiotherapy Consultation';
+  const amount = payment.amount || 0;
+  const invoiceNo = `INV-${payment._id.toString().slice(-6).toUpperCase()}`;
+
+  payment.receiptSent = true;
+  payment.receiptSentAt = new Date();
+  if (!payment.history) payment.history = [];
+  payment.history.push({
+    status: payment.status,
+    note: `Official receipt ${invoiceNo} generated & sent to patient.`,
+    timestamp: new Date(),
+  });
+  await payment.save();
+
+  if (patient?.userId) {
+    try {
+      await createNotification(
+        patient.userId,
+        `Official Receipt Issued (₹${amount})`,
+        `Your clinical payment receipt for ${serviceTitle} has been verified and issued. Tap to view and save in the mobile app.`,
+        'payment_alert',
+        {
+          paymentId: payment._id.toString(),
+          appointmentId: appt?._id?.toString(),
+          invoiceNo,
+          amount,
+          serviceTitle,
+          date: new Date().toISOString(),
+        }
+      );
+    } catch (err) {
+      console.error('Error dispatching receipt notification:', err);
+    }
+  }
+
+  revalidatePath('/admin/payments');
+  revalidatePath('/admin/appointments');
+}
+
+// Server Action: Mark In-Person Payment Paid & Send Receipt (Pay at Clinic / Home)
+async function markPaidAndSendReceiptAction(formData: FormData) {
+  'use server';
+  const paymentId = formData.get('paymentId') as string;
+  const paymentMode = (formData.get('paymentMode') as string) || 'Cash / In-person UPI';
+  if (!paymentId) return;
+
+  await connectDB();
+  const payment = await Payment.findById(paymentId).populate({
+    path: 'appointmentId',
+    model: Appointment,
+    populate: [
+      { path: 'patientId', model: Patient },
+      { path: 'serviceId', model: Service }
+    ]
+  });
+
+  if (!payment) return;
+
+  payment.status = 'paid';
+  payment.receiptSent = true;
+  payment.receiptSentAt = new Date();
+  const invoiceNo = `INV-${payment._id.toString().slice(-6).toUpperCase()}`;
+
+  if (!payment.history) payment.history = [];
+  payment.history.push({
+    status: 'paid',
+    note: `In-person payment received via ${paymentMode}. Receipt ${invoiceNo} issued.`,
+    timestamp: new Date(),
+  });
+  await payment.save();
+
+  const appt = payment.appointmentId as any;
+  if (appt?._id) {
+    const appointmentDoc = await Appointment.findById(appt._id);
+    if (appointmentDoc) {
+      if (appointmentDoc.status === 'pending') {
+        appointmentDoc.status = 'confirmed';
+      }
+      if (!appointmentDoc.statusTimeline) appointmentDoc.statusTimeline = [];
+      appointmentDoc.statusTimeline.push({
+        status: appointmentDoc.status,
+        note: `In-person payment (₹${payment.amount}) collected & verified by Admin.`,
+        timestamp: new Date(),
+      });
+      await appointmentDoc.save();
+    }
+  }
+
+  const patient = appt?.patientId;
+  const service = appt?.serviceId;
+  const serviceTitle = service?.title || 'Physiotherapy Consultation';
+  const amount = payment.amount || 0;
+
+  if (patient?.userId) {
+    try {
+      await createNotification(
+        patient.userId,
+        `Payment Received & Confirmed (₹${amount})`,
+        `Payment of ₹${amount} received (${paymentMode}). Your appointment is confirmed and official receipt has been issued!`,
+        'payment_alert',
+        {
+          paymentId: payment._id.toString(),
+          appointmentId: appt?._id?.toString(),
+          invoiceNo,
+          amount,
+          serviceTitle,
+          date: new Date().toISOString(),
+        }
+      );
+    } catch (err) {
+      console.error('Error dispatching payment received alert:', err);
+    }
+  }
+
+  revalidatePath('/admin/payments');
+  revalidatePath('/admin/appointments');
 }
 
 export default async function PaymentsPage() {
@@ -141,6 +298,8 @@ export default async function PaymentsPage() {
         <PaymentsDirectoryClient
           payments={JSON.parse(JSON.stringify(payments))}
           processRefundAction={processRefundAction}
+          sendInvoiceReceiptAction={sendInvoiceReceiptAction}
+          markPaidAndSendReceiptAction={markPaidAndSendReceiptAction}
         />
       </div>
     </div>

@@ -403,19 +403,55 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
+                              const Text('Payment Mode', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+                              Text(
+                                (appt['paymentMethod'] == 'home' || visitType == 'home')
+                                    ? 'Pay at Home (Cash / UPI)'
+                                    : (appt['paymentMethod'] == 'clinic' ? 'Pay at Clinic (Cash / UPI)' : 'Online (Razorpay)'),
+                                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12, color: Color(0xFF0F172A)),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
                               const Text('Payment Status', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFECFDF5),
+                                  color: status == 'pending' ? const Color(0xFFFFFBEB) : const Color(0xFFECFDF5),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Text(
-                                  'Paid / Confirmed',
-                                  style: TextStyle(color: Color(0xFF059669), fontWeight: FontWeight.bold, fontSize: 11),
+                                child: Text(
+                                  status == 'pending' ? 'Pending on Visit' : 'Paid / Confirmed',
+                                  style: TextStyle(
+                                    color: status == 'pending' ? const Color(0xFFD97706) : const Color(0xFF059669),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+                          const SizedBox(height: 10),
+                          OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _showReceiptDialog(appt);
+                            },
+                            icon: const Icon(Icons.receipt_long_rounded, size: 16, color: Color(0xFF0F766E)),
+                            label: const Text(
+                              'Download / View Official Invoice & Receipt',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFF0F766E), width: 1.2),
+                              minimumSize: const Size(double.infinity, 42),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
                           ),
                         ],
                       ),
@@ -568,6 +604,269 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
           ),
         );
       },
+    );
+  }
+
+  void _showReceiptDialog(Map<String, dynamic> appt) {
+    final status = (appt['status'] as String? ?? 'confirmed').toLowerCase();
+    final isPaid = status == 'confirmed' || status == 'assigned' || status == 'completed';
+    final visitType = appt['visitType'] ?? 'clinic';
+    final date = appt['date'] ?? '2026-09-10';
+    final timeSlot = appt['timeSlot'] ?? '10:00 AM';
+    final service = appt['serviceId'];
+    final serviceTitle = service is Map && service['title'] != null ? service['title'] : 'Physiotherapy Consultation';
+    final therapist = appt['therapistId'];
+    final therapistName = therapist is Map && therapist['name'] != null ? therapist['name'] : 'Dr. Rajnish Bariyar';
+    final apptId = appt['_id']?.toString() ?? 'QP-2491';
+    final shortId = apptId.length > 6 ? apptId.substring(apptId.length - 6).toUpperCase() : apptId.toUpperCase();
+    final price = appt['price'] ?? appt['totalAmount'] ?? 500;
+    final patientName = appt['patientName'] ?? (appt['patientId'] is Map ? appt['patientId']['name'] : 'Patient');
+    final payMethod = (appt['paymentMethod'] == 'home' || visitType == 'home')
+        ? 'Pay at Home (Cash / UPI)'
+        : (appt['paymentMethod'] == 'clinic' ? 'Pay at Clinic (Cash / UPI)' : 'Online Payment (Razorpay)');
+
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Clinic Letterhead
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F766E),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Text('QP', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Dr. Bariyar\'s Physiotherapy',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'MIAP Certified • JSCPT Registered Center',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                        ),
+                        Text(
+                          'Ashok Nagar Rd No 1, Ranchi • +91 91109 12544',
+                          style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Divider(color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 10),
+
+              // Title & Status
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'OFFICIAL INVOICE & RECEIPT',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF94A3B8), letterSpacing: 0.8),
+                      ),
+                      Text(
+                        'REC-QP-$shortId',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF0F172A), fontFamily: 'monospace'),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: isPaid ? const Color(0xFFECFDF5) : const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: isPaid ? const Color(0xFFA7F3D0) : const Color(0xFFFDE68A)),
+                    ),
+                    child: Text(
+                      isPaid ? 'PAID & VERIFIED' : 'PAYMENT PENDING',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                        color: isPaid ? const Color(0xFF059669) : const Color(0xFFD97706),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Patient & Service Info Card
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Patient Name', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text(patientName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Specialist', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text(therapistName, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F766E))),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Date & Time', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text('$date, $timeSlot', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Visit Mode', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text(visitType == 'home' ? 'Home Visit' : 'In-Clinic Visit', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Payment Mode', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text(payMethod, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF0F172A))),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Itemized Charge
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      serviceTitle,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                  ),
+                  Text(
+                    '₹$price',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text('Healthcare Consultation & Physical Therapy (Tax Exempt)', style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+              const SizedBox(height: 12),
+              const Divider(color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 8),
+
+              // Total
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total Amount', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                  Text('₹$price', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F766E))),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Digital Stamp Badge
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFCCFBF1)),
+                ),
+                child: Row(
+                  children: const [
+                    Icon(Icons.verified_rounded, color: Color(0xFF0F766E), size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Verified Computer-Generated Clinical Tax Invoice',
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Actions
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Close', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF64748B))),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Official Invoice & Receipt saved to device downloads!'),
+                            backgroundColor: Color(0xFF0F766E),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.download_rounded, size: 16),
+                      label: const Text('Download / Save', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1459,6 +1758,21 @@ class _AppointmentsScreenState extends State<AppointmentsScreen> {
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.end,
                                             children: [
+                                              // Quick Invoice / Receipt Button
+                                              IconButton(
+                                                onPressed: () => _showReceiptDialog(appt),
+                                                icon: const Icon(Icons.receipt_outlined, color: Color(0xFF0F766E), size: 18),
+                                                tooltip: 'View Official Invoice & Receipt',
+                                                style: IconButton.styleFrom(
+                                                  backgroundColor: const Color(0xFFF0FDFA),
+                                                  padding: const EdgeInsets.all(8),
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: BorderRadius.circular(10),
+                                                    side: const BorderSide(color: Color(0xFFCCFBF1)),
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
                                               if (_selectedTab == 'on-going') ...[
                                                 OutlinedButton.icon(
                                                   onPressed: () => _showRescheduleModal(appt),

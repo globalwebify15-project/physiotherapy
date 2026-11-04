@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
-import { connectDB, Appointment, Patient, Therapist, Service, User } from 'database';
+import { connectDB, Appointment, Patient, Therapist, Service, User, Payment } from 'database';
 import { getAuthenticatedUser } from '@/utils/auth';
 import { createNotification } from '@/utils/notifications';
 
@@ -183,10 +183,21 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const initialStatus = 'confirmed';
-    const noteText = paymentMethod === 'clinic'
-      ? 'Booked with Pay at Clinic.'
-      : 'Appointment booked successfully.';
+    // For online payments, start as pending until Razorpay verification succeeds
+    // For in-person payments (clinic or home), start as pending confirmation
+    const initialStatus = 'pending';
+    let noteText = 'Appointment booking submitted.';
+    if (paymentMethod === 'clinic') {
+      noteText = 'Booked with Pay at Clinic (Payment Pending).';
+    } else if (paymentMethod === 'home') {
+      noteText = 'Booked with Pay at Home (Cash / UPI on Visit - Payment Pending).';
+    } else if (paymentMethod === 'online') {
+      noteText = 'Booking created. Awaiting online payment via Razorpay.';
+    }
+
+    const calculatedFee = visitType === 'home'
+      ? (service.pricingHome || 950)
+      : (service.pricingClinic || 650);
 
     // Create appointment in MongoDB
     const appointment = await Appointment.create({
@@ -202,6 +213,27 @@ export async function POST(request: NextRequest) {
       notes
     });
 
+    // If Pay at Clinic or Pay at Home, immediately track pending Payment record
+    if (paymentMethod === 'clinic' || paymentMethod === 'home') {
+      try {
+        await Payment.create({
+          appointmentId: appointment._id,
+          razorpayOrderId: `${paymentMethod}_${appointment._id.toString()}`,
+          amount: calculatedFee,
+          currency: 'INR',
+          status: 'pending',
+          history: [
+            {
+              status: 'pending',
+              note: `Booked via ${paymentMethod === 'home' ? 'Pay at Home' : 'Pay at Clinic'}. Pending payment settlement.`,
+            },
+          ],
+        });
+      } catch (payErr) {
+        console.warn('Could not create pending payment record:', payErr);
+      }
+    }
+
     // Populate for response
     const populated = await Appointment.findById(appointment._id)
       .populate('patientId')
@@ -211,21 +243,23 @@ export async function POST(request: NextRequest) {
     // Dispatch Notifications
     try {
       if (notificationUserId) {
-        await createNotification(
-          notificationUserId,
-          'Appointment Confirmed',
-          `Your appointment for ${service.title} is confirmed for ${date} at ${timeSlot}.`,
-          'booking_alert',
-          { appointmentId: appointment._id }
-        );
+        if (paymentMethod === 'clinic' || paymentMethod === 'home') {
+          await createNotification(
+            notificationUserId,
+            'Appointment Requested',
+            `Your booking for ${service.title} on ${date} at ${timeSlot} has been received (${paymentMethod === 'home' ? 'Pay at Home' : 'Pay at Clinic'}). Our team will confirm shortly!`,
+            'booking_alert',
+            { appointmentId: appointment._id }
+          );
+        }
       }
 
       const adminUser = await User.findOne({ role: 'superadmin' });
       if (adminUser) {
         await createNotification(
           adminUser._id,
-          'New Appointment Booked',
-          `New appointment for ${service.title} on ${date} at ${timeSlot} (${paymentMethod === 'clinic' ? 'Pay at Clinic' : 'Online'}).`,
+          paymentMethod === 'online' ? 'Online Booking Initiated' : 'New Booking (Payment Pending)',
+          `Appointment for ${service.title} on ${date} at ${timeSlot} (${paymentMethod === 'home' ? 'Pay at Home' : paymentMethod === 'clinic' ? 'Pay at Clinic' : 'Online Razorpay'}).`,
           'booking_alert',
           { appointmentId: appointment._id }
         );

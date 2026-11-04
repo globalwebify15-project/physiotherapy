@@ -14,6 +14,8 @@ export interface IPayment extends Document {
   amount: number; // in paise or rupees. Let's store in rupees (e.g. 500)
   currency: string; // e.g. "INR"
   status: 'pending' | 'paid' | 'failed' | 'refunded';
+  receiptSent?: boolean;
+  receiptSentAt?: Date;
   history: IPaymentHistory[];
   createdAt: Date;
   updatedAt: Date;
@@ -33,6 +35,8 @@ const PaymentSchema: Schema = new Schema(
       default: 'pending',
       index: true,
     },
+    receiptSent: { type: Boolean, default: false },
+    receiptSentAt: { type: Date },
     history: [
       {
         status: { type: String, required: true },

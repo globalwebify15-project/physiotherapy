@@ -204,3 +204,35 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// DELETE /api/appointments/[id] - Delete draft or uncompleted pending appointment
+export async function DELETE(request: NextRequest, { params }: RouteContext) {
+  try {
+    await connectDB();
+    const { id } = await params;
+    const appointment = await Appointment.findById(id);
+    if (!appointment) {
+      return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
+    }
+
+    // Only allow deleting appointments that are pending or cancelled
+    if (appointment.status === 'pending' || appointment.status === 'cancelled') {
+      await Appointment.findByIdAndDelete(id);
+      return NextResponse.json({ success: true, message: 'Draft appointment discarded' });
+    }
+
+    // Otherwise mark as cancelled
+    appointment.status = 'cancelled';
+    appointment.statusTimeline.push({
+      status: 'cancelled',
+      note: 'Appointment cancelled.',
+      timestamp: new Date(),
+    });
+    await appointment.save();
+
+    return NextResponse.json({ success: true, appointment });
+  } catch (error: any) {
+    console.error('Error deleting appointment:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

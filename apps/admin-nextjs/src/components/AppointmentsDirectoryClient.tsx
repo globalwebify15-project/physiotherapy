@@ -306,6 +306,23 @@ export default function AppointmentsDirectoryClient({
 
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          {appt.status === 'pending' && (
+                            <form
+                              action={async (fd) => {
+                                await handleActionSubmit(fd, 'Appointment confirmed.');
+                              }}
+                            >
+                              <input type="hidden" name="appointmentId" value={appt._id} />
+                              <input type="hidden" name="status" value="confirmed" />
+                              <button
+                                type="submit"
+                                title="Confirm Appointment"
+                                className="bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200/60 text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <CheckCircle size={11} /> Confirm
+                              </button>
+                            </form>
+                          )}
                           {appt.status !== 'completed' && appt.status !== 'cancelled' && (
                             <>
                               <form
@@ -449,6 +466,23 @@ export default function AppointmentsDirectoryClient({
                 {/* Footer Actions */}
                 {appt.status !== 'completed' && appt.status !== 'cancelled' && (
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                    {appt.status === 'pending' && (
+                      <form
+                        action={async (fd) => {
+                          await handleActionSubmit(fd, 'Appointment confirmed.');
+                        }}
+                      >
+                        <input type="hidden" name="appointmentId" value={appt._id} />
+                        <input type="hidden" name="status" value="confirmed" />
+                        <button
+                          type="submit"
+                          className="bg-teal-50 hover:bg-teal-100 border border-teal-200/60 text-teal-700 text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <CheckCircle size={13} />
+                          Confirm
+                        </button>
+                      </form>
+                    )}
                     <form
                       action={async (fd) => {
                         await handleActionSubmit(fd, 'Appointment marked as completed.');
