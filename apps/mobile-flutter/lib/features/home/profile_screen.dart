@@ -78,23 +78,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildAvatarImage(String photoData, {double size = 96}) {
-    if (photoData.isEmpty) {
+    if (photoData.trim().isEmpty) {
       return _buildInitialsAvatar();
-    }
-    if (photoData.startsWith('data:image')) {
-      try {
-        final base64String = photoData.split(',').last;
-        final bytes = base64Decode(base64String);
-        return Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-          errorBuilder: (_, __, ___) => _buildInitialsAvatar(),
-        );
-      } catch (_) {
-        return _buildInitialsAvatar();
-      }
     }
     if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
       return Image.network(
@@ -105,7 +90,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
         errorBuilder: (_, __, ___) => _buildInitialsAvatar(),
       );
     }
-    return _buildInitialsAvatar();
+    try {
+      final base64String = photoData.contains(',') ? photoData.split(',').last : photoData;
+      final bytes = base64Decode(base64String.trim());
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        errorBuilder: (_, __, ___) => _buildInitialsAvatar(),
+      );
+    } catch (_) {
+      return _buildInitialsAvatar();
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -123,7 +120,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         if (currentMobile.isNotEmpty) _mobile = currentMobile;
         if (cachedName != null && cachedName.isNotEmpty) _name = cachedName;
-        if (cachedPhoto != null) _photoUrl = cachedPhoto;
+        if (cachedPhoto != null && cachedPhoto.isNotEmpty) _photoUrl = cachedPhoto;
         if (cachedEmail != null && cachedEmail.isNotEmpty) _email = cachedEmail;
         if (cachedAddress != null && cachedAddress.isNotEmpty) _address = cachedAddress;
         if (emergName != null && emergName.isNotEmpty) {
@@ -143,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final fetchedName = patient['name'] ?? '';
         final fetchedMobile = patient['userId'] is Map ? (patient['userId']['mobile'] ?? currentMobile) : currentMobile;
         final fetchedEmail = patient['userId'] is Map ? (patient['userId']['email'] ?? '') : '';
-        final photo = patient['profilePhoto'] ?? '';
+        final photo = patient['profilePhoto']?.toString() ?? '';
         final addr = patient['address'] ?? '';
         final gender = patient['gender'] ?? 'male';
         final dob = patient['dob'] ?? '';
@@ -160,7 +157,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _name = fetchedName.isNotEmpty ? fetchedName : (cachedName ?? 'Patient');
             _mobile = fetchedMobile.isNotEmpty ? fetchedMobile : currentMobile;
             _email = fetchedEmail;
-            _photoUrl = photo;
+            if (photo.isNotEmpty) {
+              _photoUrl = photo;
+              _storage.write(key: 'patientPhoto', value: photo);
+              if (currentMobile.isNotEmpty) {
+                _storage.write(key: 'patientPhoto_$currentMobile', value: photo);
+              }
+            } else if (cachedPhoto != null && cachedPhoto.isNotEmpty) {
+              _photoUrl = cachedPhoto;
+            }
             _address = addr;
             _gender = gender;
             _dob = dob;
@@ -184,9 +189,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final XFile? file = await _picker.pickImage(
         source: source,
-        maxWidth: 600,
-        maxHeight: 600,
-        imageQuality: 85,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 70,
       );
 
       if (file != null) {
@@ -198,8 +203,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
 
         await _storage.write(key: 'patientPhoto', value: base64Image);
+        if (_mobile.isNotEmpty) {
+          await _storage.write(key: 'patientPhoto_$_mobile', value: base64Image);
+        }
         try {
           await _apiService.post('/patients', data: {
+            'mobile': _mobile,
             'name': _name,
             'profilePhoto': base64Image,
           });

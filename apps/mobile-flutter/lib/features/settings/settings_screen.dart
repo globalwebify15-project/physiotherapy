@@ -84,35 +84,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Widget _buildAvatar() {
-    if (_photoUrl.isEmpty) {
+    if (_photoUrl.trim().isEmpty) {
       return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30);
     }
-    if (_photoUrl.startsWith('data:image')) {
-      try {
-        final base64String = _photoUrl.split(',').last;
-        final bytes = base64Decode(base64String);
-        return ClipOval(
-          child: Image.memory(
-            bytes,
-            fit: BoxFit.cover,
-            width: 52,
-            height: 52,
-            errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30),
-          ),
-        );
-      } catch (_) {
-        return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30);
-      }
+    if (_photoUrl.startsWith('http://') || _photoUrl.startsWith('https://')) {
+      return ClipOval(
+        child: Image.network(
+          _photoUrl,
+          fit: BoxFit.cover,
+          width: 52,
+          height: 52,
+          errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30),
+        ),
+      );
     }
-    return ClipOval(
-      child: Image.network(
-        _photoUrl,
-        fit: BoxFit.cover,
-        width: 52,
-        height: 52,
-        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30),
-      ),
-    );
+    try {
+      final base64String = _photoUrl.contains(',') ? _photoUrl.split(',').last : _photoUrl;
+      final bytes = base64Decode(base64String.trim());
+      return ClipOval(
+        child: Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          width: 52,
+          height: 52,
+          errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30),
+        ),
+      );
+    } catch (_) {
+      return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 30);
+    }
   }
 
   void _clearCache() {

@@ -25,12 +25,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _apiService = ApiService();
   bool _isLoading = false;
 
-  // Dynamic Dashboard Data
+  // Dynamic Dashboard Data - pre-seeded with instant offline catalog so UI renders with 0ms delay
   String _patientName = 'Patient';
+  String _patientPhoto = '';
   String _locationAddress = 'Set your clinic or home address';
   List<dynamic> _appointments = [];
-  List<dynamic> _services = [];
-  List<dynamic> _therapists = [];
+  List<dynamic> _services = ApiService.mockServices;
+  List<dynamic> _therapists = ApiService.mockTherapists;
   List<Map<String, dynamic>> _banners = ApiService.defaultBanners;
   List<Map<String, String>> _faqs = ApiService.defaultFaqs;
 
@@ -131,6 +132,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final currentMobile = await storage.read(key: 'userMobile') ?? '';
     final cachedName = await storage.read(key: 'patientName_$currentMobile') ?? await storage.read(key: 'patientName');
     final cachedAddr = await storage.read(key: 'patientAddress_$currentMobile') ?? await storage.read(key: 'patientAddress');
+    final cachedPhoto = await storage.read(key: 'patientPhoto_$currentMobile') ?? await storage.read(key: 'patientPhoto');
 
     if (mounted) {
       setState(() {
@@ -144,11 +146,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         } else {
           _locationAddress = 'Set your clinic or home address';
         }
+        if (cachedPhoto != null && cachedPhoto.isNotEmpty) {
+          _patientPhoto = cachedPhoto;
+        }
       });
     }
 
     try {
-      // Execute all dashboard sync operations concurrently in parallel
+      // 1. Preload all CMS blocks in one roundtrip
+      await _apiService.preloadCms();
+
+      // 2. Execute dashboard sync operations concurrently in parallel
       final results = await Future.wait([
         _apiService.get('/patients').catchError((_) => Response(requestOptions: RequestOptions(path: '/patients'), statusCode: 500)),
         _apiService.get('/appointments').catchError((_) => Response(requestOptions: RequestOptions(path: '/appointments'), statusCode: 500)),
@@ -156,8 +164,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         _apiService.get('/therapists').catchError((_) => Response(requestOptions: RequestOptions(path: '/therapists'), statusCode: 500)),
         _apiService.fetchCmsBanners().catchError((_) => ApiService.defaultBanners),
         _apiService.fetchCmsFaqs().catchError((_) => ApiService.defaultFaqs),
-        _apiService.fetchCmsContactDetails().catchError((_) => null),
-        _apiService.fetchCmsAboutClinic().catchError((_) => null),
       ]);
 
       final patientRes = results[0] as Response;
@@ -172,6 +178,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           if (patientRes.statusCode == 200 && patientRes.data != null && patientRes.data['patient'] != null) {
             final pData = patientRes.data['patient'];
             final fetchedName = pData['name']?.toString() ?? '';
+            final fetchedPhoto = pData['profilePhoto']?.toString() ?? '';
             final fetchedAddress = pData['address']?.toString() ??
                 (pData['savedAddresses'] is List && (pData['savedAddresses'] as List).isNotEmpty
                     ? pData['savedAddresses'][0]['addressLine']?.toString() ?? ''
@@ -180,6 +187,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               _patientName = fetchedName;
               storage.write(key: 'patientName', value: fetchedName);
               if (currentMobile.isNotEmpty) storage.write(key: 'patientName_$currentMobile', value: fetchedName);
+            }
+            if (fetchedPhoto.isNotEmpty) {
+              _patientPhoto = fetchedPhoto;
+              storage.write(key: 'patientPhoto', value: fetchedPhoto);
+              if (currentMobile.isNotEmpty) storage.write(key: 'patientPhoto_$currentMobile', value: fetchedPhoto);
             }
             if (fetchedAddress.isNotEmpty) {
               _locationAddress = fetchedAddress;
@@ -774,6 +786,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           AppHeader(
             isDashboard: true,
             userName: _patientName,
+            userPhoto: _patientPhoto,
             locationAddress: _locationAddress,
             onSearchTap: () => context.push('/all_services'),
             onNotificationTap: () => showNotificationsSheet(context),

@@ -200,9 +200,17 @@ export default function PatientsDirectoryClient({
                       <tr key={patient._id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 font-extrabold flex items-center justify-center text-xs border border-teal-100 uppercase shrink-0">
-                              {patient.name?.charAt(0) || 'P'}
-                            </div>
+                            {patient.profilePhoto ? (
+                              <img
+                                src={patient.profilePhoto}
+                                alt={patient.name}
+                                className="w-9 h-9 rounded-xl object-cover border border-slate-200 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-700 font-extrabold flex items-center justify-center text-xs border border-teal-100 uppercase shrink-0">
+                                {patient.name?.charAt(0) || 'P'}
+                              </div>
+                            )}
                             <div>
                               <div className="font-bold text-slate-900 text-sm">{patient.name}</div>
                               <div className="text-[10px] text-slate-400 capitalize">
@@ -313,9 +321,17 @@ export default function PatientsDirectoryClient({
                     {/* Header */}
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100/80 flex items-center justify-center text-teal-700 font-extrabold text-base">
-                          {patient.name?.charAt(0) || 'P'}
-                        </div>
+                        {patient.profilePhoto ? (
+                          <img
+                            src={patient.profilePhoto}
+                            alt={patient.name}
+                            className="w-12 h-12 rounded-2xl object-cover border border-slate-200 shrink-0 shadow-xs"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-2xl bg-teal-50 border border-teal-100/80 flex items-center justify-center text-teal-700 font-extrabold text-base shrink-0">
+                            {patient.name?.charAt(0) || 'P'}
+                          </div>
+                        )}
                         <div>
                           <h3 className="font-bold text-slate-800 text-base leading-tight">{patient.name}</h3>
                           <p className="text-xs text-slate-400 capitalize mt-0.5">

@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const user = await getAuthenticatedUser(request);
     const body = await request.json();
-    const { name, gender, dob, emergencyContact, savedAddresses, medicalHistory, mobile, address } = body;
+    const { name, gender, dob, emergencyContact, savedAddresses, medicalHistory, mobile, address, profilePhoto } = body;
 
     let targetUserId = user?.userId;
 
@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
       if (emergencyContact) patient.emergencyContact = emergencyContact;
       if (formattedAddresses.length > 0) patient.savedAddresses = formattedAddresses;
       if (medicalHistory) patient.medicalHistory = medicalHistory;
+      if (profilePhoto !== undefined) patient.profilePhoto = profilePhoto;
       await patient.save();
     } else {
       patient = await Patient.create({
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
         name: name || 'Patient',
         gender: gender || 'other',
         dob: dob ? new Date(dob) : new Date('2000-01-01'),
+        profilePhoto: profilePhoto || '',
         emergencyContact: emergencyContact || {
           name: 'Self',
           phone: mobile || '',

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'notifications_sheet.dart';
 import 'package:go_router/go_router.dart';
@@ -5,6 +6,7 @@ import 'package:go_router/go_router.dart';
 class AppHeader extends StatelessWidget {
   final bool isDashboard;
   final String? userName;
+  final String? userPhoto;
   final String? locationAddress;
   final String? title;
   final bool showBack;
@@ -17,6 +19,7 @@ class AppHeader extends StatelessWidget {
     super.key,
     this.isDashboard = false,
     this.userName,
+    this.userPhoto,
     this.locationAddress,
     this.title,
     this.showBack = true,
@@ -51,6 +54,38 @@ class AppHeader extends StatelessWidget {
     );
   }
 
+  Widget _buildDashboardAvatar() {
+    if (userPhoto != null && userPhoto!.trim().isNotEmpty) {
+      if (userPhoto!.startsWith('http://') || userPhoto!.startsWith('https://')) {
+        return ClipOval(
+          child: Image.network(
+            userPhoto!,
+            fit: BoxFit.cover,
+            width: 46,
+            height: 46,
+            errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 26),
+          ),
+        );
+      }
+      try {
+        final base64String = userPhoto!.contains(',') ? userPhoto!.split(',').last : userPhoto!;
+        final bytes = base64Decode(base64String.trim());
+        return ClipOval(
+          child: Image.memory(
+            bytes,
+            fit: BoxFit.cover,
+            width: 46,
+            height: 46,
+            errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Colors.white, size: 26),
+          ),
+        );
+      } catch (_) {
+        return const Icon(Icons.person_rounded, color: Colors.white, size: 26);
+      }
+    }
+    return const Icon(Icons.person_rounded, color: Colors.white, size: 26);
+  }
+
   Widget _buildDashboardHeader(BuildContext context) {
     return Row(
       children: [
@@ -65,11 +100,7 @@ class AppHeader extends StatelessWidget {
               color: Colors.white.withOpacity(0.18),
               border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
             ),
-            child: const Icon(
-              Icons.person_rounded,
-              color: Colors.white,
-              size: 26,
-            ),
+            child: _buildDashboardAvatar(),
           ),
         ),
         const SizedBox(width: 12),

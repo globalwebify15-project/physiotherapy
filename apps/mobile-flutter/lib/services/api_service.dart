@@ -268,10 +268,18 @@ class ApiService {
     },
   ];
 
+  // High-performance In-Memory Cache with TTL to eliminate UI lag & network freezing
+  static final Map<String, dynamic> _memoryCache = {};
+  static final Map<String, DateTime> _cacheTimestamps = {};
+  static const Duration _cacheTtl = Duration(minutes: 5);
+
+  static List<Map<String, dynamic>> get mockServices => _mockServices;
+  static List<Map<String, dynamic>> get mockTherapists => _mockTherapists;
+
   ApiService() {
     _dio.options.baseUrl = _baseUrl;
-    _dio.options.connectTimeout = const Duration(milliseconds: 10000);
-    _dio.options.receiveTimeout = const Duration(milliseconds: 10000);
+    _dio.options.connectTimeout = const Duration(milliseconds: 6000);
+    _dio.options.receiveTimeout = const Duration(milliseconds: 6000);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -324,9 +332,38 @@ class ApiService {
     }
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  /// Instant In-Memory Cache Lookup Helper
+  static dynamic getCachedData(String key) {
+    if (_memoryCache.containsKey(key)) {
+      final stamp = _cacheTimestamps[key];
+      if (stamp != null && DateTime.now().difference(stamp) < _cacheTtl) {
+        return _memoryCache[key];
+      }
+    }
+    return null;
+  }
+
+  static void setCachedData(String key, dynamic data) {
+    _memoryCache[key] = data;
+    _cacheTimestamps[key] = DateTime.now();
+  }
+
+  Future<Response> get(String path, {Map<String, dynamic>? queryParameters, bool forceRefresh = false}) async {
     final currentMobile = await _storage.read(key: 'userMobile') ?? '';
     final cleanMobile = currentMobile.replaceFirst(RegExp(r'^\+91'), '').trim();
+    final cacheKey = '$path?${queryParameters?.entries.map((e) => '${e.key}=${e.value}').join('&') ?? ''}';
+
+    // Return instant memory cache for catalog data if fresh
+    if (!forceRefresh && (path.startsWith('/services') || path.startsWith('/therapists') || path.startsWith('/cms'))) {
+      final cached = getCachedData(cacheKey);
+      if (cached != null) {
+        return Response(
+          requestOptions: RequestOptions(path: path),
+          statusCode: 200,
+          data: cached,
+        );
+      }
+    }
 
     if (!_useMockMode) {
       try {
@@ -335,12 +372,18 @@ class ApiService {
           params['mobile'] = cleanMobile;
         }
         final res = await _dio.get(path, queryParameters: params);
-        if (res.statusCode == 200 && path.startsWith('/appointments') && res.data is Map && res.data['appointments'] != null) {
-          final liveList = List<Map<String, dynamic>>.from(
-            (res.data['appointments'] as List).map((e) => Map<String, dynamic>.from(e as Map))
-          );
-          if (liveList.isNotEmpty) {
-            await _saveUserAppointments(cleanMobile, liveList);
+        if (res.statusCode == 200 && res.data != null) {
+          // Store successful response in memory cache
+          if (path.startsWith('/services') || path.startsWith('/therapists') || path.startsWith('/cms')) {
+            setCachedData(cacheKey, res.data);
+          }
+          if (path.startsWith('/appointments') && res.data is Map && res.data['appointments'] != null) {
+            final liveList = List<Map<String, dynamic>>.from(
+              (res.data['appointments'] as List).map((e) => Map<String, dynamic>.from(e as Map))
+            );
+            if (liveList.isNotEmpty) {
+              await _saveUserAppointments(cleanMobile, liveList);
+            }
           }
         }
         return res;
@@ -816,6 +859,28 @@ class ApiService {
   // ==========================================
   // DYNAMIC CMS SERVICES (Banners, FAQs, Contact)
   // ==========================================
+
+  /// Preloads all CMS blocks in 1 single network roundtrip to eliminate multiple network calls
+  Future<void> preloadCms() async {
+    try {
+      final res = await get('/cms');
+      if (res.statusCode == 200 && res.data != null && res.data['cmsBlocks'] is List) {
+        for (final block in res.data['cmsBlocks']) {
+          if (block is Map && block['key'] != null) {
+            final key = block['key'].toString();
+            setCachedData('/cms?key=$key', {'success': true, 'key': key, 'content': block['content']});
+            if (key == 'contact_details' && block['content'] is Map) {
+              PhoneHelper.updateFromCms(Map<String, dynamic>.from(block['content']));
+            } else if (key == 'about_clinic' && block['content'] is Map) {
+              PhoneHelper.updateAboutFromCms(Map<String, dynamic>.from(block['content']));
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('[preloadCms Note]: $e');
+    }
+  }
 
   /// Fetches live banners from MongoDB Atlas CMS via Next.js backend,
   /// with automatic fallback to the 5 pristine core offline banners.

@@ -74,23 +74,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Widget _buildAvatarImage(String photoData, {double size = 64}) {
-    if (photoData.isEmpty) {
+    if (photoData.trim().isEmpty) {
       return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
-    }
-    if (photoData.startsWith('data:image')) {
-      try {
-        final base64String = photoData.split(',').last;
-        final bytes = base64Decode(base64String);
-        return Image.memory(
-          bytes,
-          fit: BoxFit.cover,
-          width: size,
-          height: size,
-          errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36),
-        );
-      } catch (_) {
-        return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
-      }
     }
     if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
       return Image.network(
@@ -101,7 +86,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
         errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36),
       );
     }
-    return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
+    try {
+      final base64String = photoData.contains(',') ? photoData.split(',').last : photoData;
+      final bytes = base64Decode(base64String.trim());
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        width: size,
+        height: size,
+        errorBuilder: (_, __, ___) => const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36),
+      );
+    } catch (_) {
+      return const Icon(Icons.person_rounded, color: Color(0xFF0F766E), size: 36);
+    }
   }
 
   Future<void> _pickImageFromFile({ImageSource source = ImageSource.gallery}) async {
@@ -109,9 +106,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final ImagePicker picker = ImagePicker();
       final XFile? file = await picker.pickImage(
         source: source,
-        maxWidth: 600,
-        maxHeight: 600,
-        imageQuality: 85,
+        maxWidth: 400,
+        maxHeight: 400,
+        imageQuality: 70,
       );
 
       if (file != null) {
@@ -121,6 +118,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _photoController.text = base64Image;
         });
         await _storage.write(key: 'patientPhoto', value: base64Image);
+        final rawDigits = _mobileController.text.trim().replaceAll(RegExp(r'\D'), '');
+        if (rawDigits.isNotEmpty) {
+          await _storage.write(key: 'patientPhoto_$rawDigits', value: base64Image);
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
