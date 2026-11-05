@@ -165,6 +165,91 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  String? _findMatchingServiceId(String? targetId, String? targetTitle) {
+    if (_services.isEmpty) return null;
+
+    // 1. Direct ID match
+    if (targetId != null && targetId.isNotEmpty) {
+      for (final s in _services) {
+        if (s is Map && s['_id']?.toString() == targetId.toString()) {
+          return s['_id']?.toString();
+        }
+      }
+    }
+
+    // 2. Title matching with clinical aliases
+    if (targetTitle != null && targetTitle.trim().isNotEmpty) {
+      final cleanTarget = targetTitle.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), ' ').trim();
+      final targetWords = cleanTarget.split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
+
+      // 2a. Direct exact or substring match
+      for (final s in _services) {
+        if (s is Map) {
+          final sTitle = (s['title'] ?? '').toString().toLowerCase();
+          final sClean = sTitle.replaceAll(RegExp(r'[^a-z0-9]'), ' ').trim();
+          if (sClean == cleanTarget || sTitle.contains(targetTitle.toLowerCase()) || targetTitle.toLowerCase().contains(sTitle)) {
+            return s['_id']?.toString();
+          }
+        }
+      }
+
+      // 2b. Clinical alias keyword score matching (e.g. "OA (Knee Pain)" -> "OA (Knee Osteoarthritis) Relief")
+      final Map<String, List<String>> aliases = {
+        'stroke': ['stroke', 'paralysis', 'hemiplegia', 'paralytic'],
+        'parkinson': ['parkinson', 'alzheimer', 'tremor', 'dementia'],
+        'facial': ['facial', 'bell', 'palsy', 'face'],
+        'vestibular': ['vestibular', 'vertigo', 'balance', 'dizziness'],
+        'cervical': ['cervical', 'neck', 'spondylosis', 'trapezitis'],
+        'lumbar': ['lumbar', 'sciatica', 'back', 'disc', 'spondylolisthesis'],
+        'knee': ['knee', 'oa', 'osteoarthritis', 'patella', 'pain'],
+        'elbow': ['tennis', 'golfer', 'elbow', 'epicondylitis'],
+        'shoulder': ['shoulder', 'frozen', 'capsulitis', 'rotator'],
+        'cp': ['cp', 'cerebral', 'palsy', 'child'],
+        'delay': ['delay', 'developmental', 'milestone'],
+        'autism': ['autism', 'sensory', 'asd'],
+        'prenatal': ['prenatal', 'postnatal', 'pregnancy', 'maternity', 'pelvic'],
+        'replacement': ['replacement', 'joint', 'arthroplasty', 'hip'],
+        'sports': ['sports', 'ligament', 'acl', 'sprain', 'athletic', 'injury'],
+      };
+
+      int bestScore = 0;
+      String? bestId;
+
+      for (final s in _services) {
+        if (s is Map) {
+          final sTitle = (s['title'] ?? '').toString().toLowerCase();
+          final sClean = sTitle.replaceAll(RegExp(r'[^a-z0-9]'), ' ').trim();
+          final sWords = sClean.split(RegExp(r'\s+')).where((w) => w.length > 2).toSet();
+
+          int score = 0;
+          for (final w in targetWords) {
+            if (sWords.contains(w) || sClean.contains(w)) {
+              score += 3;
+            }
+          }
+          for (final entry in aliases.entries) {
+            final targetHasAlias = entry.value.any((k) => cleanTarget.contains(k));
+            final sHasAlias = entry.value.any((k) => sClean.contains(k));
+            if (targetHasAlias && sHasAlias) {
+              score += 5;
+            }
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            bestId = s['_id']?.toString();
+          }
+        }
+      }
+
+      if (bestScore > 0 && bestId != null) {
+        return bestId;
+      }
+    }
+
+    return null;
+  }
+
   void _applyInitialSelections() {
     if (widget.initialDoctorId != null && widget.initialDoctorId!.isNotEmpty) {
       _selectedTherapistId = widget.initialDoctorId;
@@ -376,21 +461,11 @@ class _BookingScreenState extends State<BookingScreen> {
             _selectedTherapistId = _therapists[0]['_id']?.toString();
           }
         }
-        if (widget.initialServiceId != null && widget.initialServiceId!.isNotEmpty) {
-          final matched = _services.firstWhere(
-            (s) => s['_id']?.toString() == widget.initialServiceId?.toString(),
-            orElse: () => null,
-          );
-          if (matched != null) {
-            _selectedServiceId = matched['_id']?.toString();
-          }
-        } else if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
-          final matched = _services.firstWhere(
-            (s) => s['title'] != null && s['title'].toString().toLowerCase().contains(widget.initialServiceTitle!.toLowerCase()),
-            orElse: () => null,
-          );
-          if (matched != null) {
-            _selectedServiceId = matched['_id']?.toString();
+        final matchedId = _findMatchingServiceId(widget.initialServiceId, widget.initialServiceTitle);
+        if (matchedId != null) {
+          _selectedServiceId = matchedId;
+          if (_promoController.text.trim().isNotEmpty && _appliedCoupon == null) {
+            _applyPromoCode();
           }
         }
         // Deliberately keep _selectedServiceId as null if no initial selection was passed,
@@ -418,21 +493,11 @@ class _BookingScreenState extends State<BookingScreen> {
           {'_id': '14', 'title': 'Knee / Hip Replacement Rehab', 'pricingHome': 1350, 'pricingClinic': 900, 'homePrice': 1350, 'clinicPrice': 900},
           {'_id': '15', 'title': 'Sports Injury Management', 'pricingHome': 1250, 'pricingClinic': 850, 'homePrice': 1250, 'clinicPrice': 850},
         ];
-        if (widget.initialServiceId != null && widget.initialServiceId!.isNotEmpty) {
-          final matched = _services.firstWhere(
-            (s) => s['_id']?.toString() == widget.initialServiceId?.toString(),
-            orElse: () => null,
-          );
-          if (matched != null) {
-            _selectedServiceId = matched['_id']?.toString();
-          }
-        } else if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
-          final matched = _services.firstWhere(
-            (s) => s['title'] != null && s['title'].toString().toLowerCase().contains(widget.initialServiceTitle!.toLowerCase()),
-            orElse: () => null,
-          );
-          if (matched != null) {
-            _selectedServiceId = matched['_id']?.toString();
+        final matchedId = _findMatchingServiceId(widget.initialServiceId, widget.initialServiceTitle);
+        if (matchedId != null) {
+          _selectedServiceId = matchedId;
+          if (_promoController.text.trim().isNotEmpty && _appliedCoupon == null) {
+            _applyPromoCode();
           }
         }
         _isLoading = false;

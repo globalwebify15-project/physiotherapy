@@ -653,7 +653,7 @@ export default function PaymentsDirectoryClient({
                       </div>
                       <div>
                         <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Clinical Details</span>
-                        <div className="font-bold text-slate-800 mt-0.5">Assigned Specialist: {invTherapist?.name || 'Dr. Rajnish Bariyar'}</div>
+                        <div className="font-bold text-slate-800 mt-0.5">Assigned Specialist: {invTherapist?.name || 'QuickPhysio24 Specialist'}</div>
                         <div className="text-slate-600 mt-0.5">Appointment Date: {invAppt?.date || 'N/A'} ({invAppt?.timeSlot || '10:00 AM'})</div>
                         <div className="text-slate-600 mt-0.5">Razorpay Order ID: <span className="font-mono">{selectedInvoice.razorpayOrderId || 'N/A'}</span></div>
                       </div>

@@ -368,7 +368,9 @@ class ApiService {
     if (!_useMockMode) {
       try {
         final params = Map<String, dynamic>.from(queryParameters ?? {});
-        if (path.startsWith('/appointments') && cleanMobile.isNotEmpty && !params.containsKey('mobile')) {
+        if ((path.startsWith('/appointments') || path.startsWith('/patients') || path.startsWith('/reviews')) &&
+            cleanMobile.isNotEmpty &&
+            !params.containsKey('mobile')) {
           params['mobile'] = cleanMobile;
         }
         final res = await _dio.get(path, queryParameters: params);

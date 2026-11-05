@@ -13,9 +13,14 @@ export async function GET(request: NextRequest) {
     let targetUserId = user?.userId;
 
     if (!targetUserId && mobileParam) {
-      const clean = mobileParam.replace(/^\+91/, '').trim();
+      const clean = mobileParam.replace(/^\+91|\D/g, '').trim();
       const dbUser = await User.findOne({
-        $or: [{ mobile: clean }, { mobile: `+91${clean}` }, { mobile: mobileParam }]
+        $or: [
+          { mobile: clean },
+          { mobile: `+91${clean}` },
+          { mobile: mobileParam },
+          { mobile: { $regex: clean, $options: 'i' } }
+        ]
       });
       if (dbUser) targetUserId = dbUser._id;
     }
@@ -23,11 +28,12 @@ export async function GET(request: NextRequest) {
     if (user?.role === 'patient' || targetUserId || mobileParam) {
       let patient = targetUserId ? await Patient.findOne({ userId: targetUserId }).populate('userId') : null;
       if (!patient && mobileParam) {
-        const clean = mobileParam.replace(/^\+91/, '').trim();
+        const clean = mobileParam.replace(/^\+91|\D/g, '').trim();
         patient = await Patient.findOne({
           $or: [
             { 'emergencyContact.phone': clean },
             { 'emergencyContact.phone': `+91${clean}` },
+            { 'emergencyContact.phone': { $regex: clean } },
             { savedAddresses: { $elemMatch: { phone: clean } } },
           ]
         }).populate('userId');
@@ -35,7 +41,8 @@ export async function GET(request: NextRequest) {
       if (!patient) {
         return NextResponse.json({ error: 'Patient profile not found' }, { status: 404 });
       }
-      return NextResponse.json({ success: true, patient });
+      const populatedPatient = await Patient.findById(patient._id).populate('userId');
+      return NextResponse.json({ success: true, patient: populatedPatient || patient });
     }
 
     // Admin / Staff search and filter
@@ -62,25 +69,46 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const user = await getAuthenticatedUser(request);
     const body = await request.json();
-    const { name, gender, dob, emergencyContact, savedAddresses, medicalHistory, mobile, address, profilePhoto } = body;
+    const { name, gender, dob, emergencyContact, savedAddresses, medicalHistory, mobile, address, profilePhoto, email } = body;
 
     let targetUserId = user?.userId;
+    let foundUser: any = null;
 
-    if (!targetUserId && mobile) {
-      const clean = mobile.replace(/^\+91/, '').trim();
-      let dbUser = await User.findOne({
-        $or: [{ mobile: clean }, { mobile: `+91${clean}` }, { mobile }]
+    if (targetUserId) {
+      foundUser = await User.findById(targetUserId);
+    }
+
+    if (!foundUser && mobile) {
+      const clean = mobile.replace(/^\+91|\D/g, '').trim();
+      foundUser = await User.findOne({
+        $or: [{ mobile: clean }, { mobile: `+91${clean}` }, { mobile }, { mobile: { $regex: clean } }]
       });
-      if (!dbUser && clean.length >= 10) {
-        dbUser = await User.create({ mobile: clean, role: 'patient', isActive: true });
+      if (!foundUser && clean.length >= 10) {
+        foundUser = await User.create({ mobile: `+91${clean}`, role: 'patient', isActive: true });
       }
-      if (dbUser) {
-        targetUserId = dbUser._id;
+      if (foundUser) {
+        targetUserId = foundUser._id;
       }
     }
 
     if (!targetUserId) {
       return NextResponse.json({ error: 'Unauthorized or missing mobile identifier' }, { status: 401 });
+    }
+
+    // Sync email and name on User model
+    if (foundUser) {
+      let userUpdated = false;
+      if (email && email.trim() && foundUser.email !== email.trim()) {
+        foundUser.email = email.trim();
+        userUpdated = true;
+      }
+      if (name && name.trim() && foundUser.name !== name.trim()) {
+        foundUser.name = name.trim();
+        userUpdated = true;
+      }
+      if (userUpdated) {
+        await foundUser.save();
+      }
     }
 
     const formattedAddresses = (savedAddresses && savedAddresses.length > 0)
@@ -115,7 +143,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    return NextResponse.json({ success: true, patient });
+    const populatedPatient = await Patient.findById(patient._id).populate('userId');
+      return NextResponse.json({ success: true, patient: populatedPatient || patient });
   } catch (error: any) {
     console.error('Error saving patient profile:', error);
     return NextResponse.json({ error: 'Internal server error', details: error.message }, { status: 500 });

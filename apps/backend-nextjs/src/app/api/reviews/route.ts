@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectDB, Review, Appointment, Patient, Therapist, Service } from 'database';
+import { connectDB, Review, Appointment, Patient, Therapist, Service, User } from 'database';
 import { getAuthenticatedUser } from '@/utils/auth';
 
 // GET /api/reviews - Retrieve reviews (public, by therapist, or current patient's own reviews)
@@ -17,17 +17,35 @@ export async function GET(request: NextRequest) {
       filter.isModerated = true; // default to published reviews for public views
     }
 
-    if (isMyParam && patientMobile) {
-      const cleanMobile = patientMobile.replace(/^\+91/, '').trim();
-      const patient = await Patient.findOne({
+    if (patientMobile) {
+      const cleanMobile = patientMobile.replace(/^\+91|\D/g, '').trim();
+      const dbUser = await User.findOne({
         $or: [
-          { 'emergencyContact.phone': cleanMobile },
-          { 'emergencyContact.phone': `+91${cleanMobile}` },
-          { 'emergencyContact.phone': new RegExp(cleanMobile) },
+          { mobile: cleanMobile },
+          { mobile: `+91${cleanMobile}` },
+          { mobile: patientMobile },
+          { mobile: { $regex: cleanMobile } },
         ],
       });
-      if (patient) {
+      let patient = dbUser ? await Patient.findOne({ userId: dbUser._id }) : null;
+      if (!patient && cleanMobile) {
+        patient = await Patient.findOne({
+          $or: [
+            { 'emergencyContact.phone': cleanMobile },
+            { 'emergencyContact.phone': `+91${cleanMobile}` },
+          ],
+        });
+      }
+
+      if (isMyParam && patient) {
         filter = { patientId: patient._id };
+      } else if (!isAllParam && patient) {
+        filter = {
+          $or: [
+            { isModerated: true },
+            { patientId: patient._id },
+          ],
+        };
       }
     } else if (therapistId) {
       filter.therapistId = therapistId;
@@ -60,48 +78,84 @@ export async function POST(request: NextRequest) {
 
     // 1. Authenticate user if token exists, or fallback gracefully to patient details
     const user = await getAuthenticatedUser(request);
+    let targetUserId = user?.userId;
     let patient = null;
 
-    if (user) {
-      patient = await Patient.findOne({ userId: user.userId });
-      if (!patient && user.mobile) {
-        const cleanUserMobile = user.mobile.replace(/^\+91/, '').trim();
-        patient = await Patient.findOne({
-          $or: [
-            { 'emergencyContact.phone': cleanUserMobile },
-            { 'emergencyContact.phone': `+91${cleanUserMobile}` },
-          ],
+    if (targetUserId) {
+      patient = await Patient.findOne({ userId: targetUserId });
+    }
+
+    // Lookup user by mobile if targetUserId is missing or no patient
+    const rawMobile = (patientMobile || user?.mobile || '').toString();
+    const cleanMobile = rawMobile.replace(/^\+91|\D/g, '').trim();
+
+    if (!patient && cleanMobile.length > 0) {
+      let dbUser = await User.findOne({
+        $or: [
+          { mobile: cleanMobile },
+          { mobile: `+91${cleanMobile}` },
+          { mobile: rawMobile },
+          { mobile: { $regex: cleanMobile } },
+        ],
+      });
+
+      if (!dbUser && cleanMobile.length >= 10) {
+        dbUser = await User.create({
+          mobile: `+91${cleanMobile}`,
+          name: (patientName || 'Verified Patient').toString().trim(),
+          role: 'patient',
+          isActive: true,
         });
+      }
+
+      if (dbUser) {
+        targetUserId = dbUser._id;
+        patient = await Patient.findOne({ userId: dbUser._id });
       }
     }
 
-    // Fallback: match by incoming patientMobile
-    if (!patient && patientMobile) {
-      const cleanMobile = patientMobile.toString().replace(/^\+91/, '').trim();
+    // Fallback: match patient by emergency contact phone
+    if (!patient && cleanMobile.length > 0) {
       patient = await Patient.findOne({
         $or: [
           { 'emergencyContact.phone': cleanMobile },
           { 'emergencyContact.phone': `+91${cleanMobile}` },
+          { 'emergencyContact.phone': { $regex: cleanMobile } },
         ],
       });
     }
 
-    // If still no patient found, create a verified patient record
+    // If still no patient found, ensure a User exists and create a valid Patient (userId is strictly required by schema)
     if (!patient) {
       const displayName = (patientName || 'Verified Patient').toString().trim();
-      const contactPhone = (patientMobile || user?.mobile || '9110912544').toString().replace(/^\+91/, '').trim();
+      const phoneToUse = cleanMobile.length >= 10 ? cleanMobile : '9110912544';
+
+      let fallbackUser = targetUserId ? await User.findById(targetUserId) : null;
+      if (!fallbackUser) {
+        fallbackUser = await User.create({
+          mobile: `+91${phoneToUse}`,
+          name: displayName,
+          role: 'patient',
+          isActive: true,
+        });
+      }
+
       patient = await Patient.create({
+        userId: fallbackUser._id,
         name: displayName,
         gender: 'other',
         dob: new Date('2000-01-01'),
         emergencyContact: {
           name: displayName,
-          phone: contactPhone,
+          phone: `+91${phoneToUse}`,
           relation: 'Self',
         },
         savedAddresses: [],
         medicalHistory: [treatment || 'Physiotherapy Consultation'],
       });
+    } else if (patientName && (!patient.name || patient.name === 'Patient' || patient.name.startsWith('Patient ('))) {
+      patient.name = patientName.toString().trim();
+      await patient.save();
     }
 
     let finalTherapistId = therapistId;
@@ -123,7 +177,7 @@ export async function POST(request: NextRequest) {
       if (matchedService) finalServiceId = matchedService._id;
     }
 
-    // Default therapist (Dr. Rajnish Bariyar / active specialist)
+    // Default therapist (QuickPhysio24 active specialist)
     if (!finalTherapistId) {
       const defaultTherapist = await Therapist.findOne({ isActive: true });
       if (defaultTherapist) finalTherapistId = defaultTherapist._id;
@@ -151,7 +205,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, review }, { status: 201 });
+    const populatedReview = await Review.findById(review._id)
+      .populate('patientId', 'name profilePhoto emergencyContact')
+      .populate('therapistId', 'name qualification')
+      .populate('serviceId', 'title')
+      .lean();
+
+    return NextResponse.json({ success: true, review: populatedReview || review }, { status: 201 });
   } catch (error: any) {
     console.error('Error creating review:', error);
     return NextResponse.json({ error: error?.message || 'Internal server error' }, { status: 500 });

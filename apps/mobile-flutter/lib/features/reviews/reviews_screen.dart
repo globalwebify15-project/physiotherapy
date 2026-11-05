@@ -107,7 +107,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
   Future<void> _fetchReviews() async {
     final List<Map<String, dynamic>> localReviews = await _loadLocalReviews();
     try {
-      final res = await _apiService.get('/reviews');
+      final res = await _apiService.get('/reviews', forceRefresh: true);
       if (res.statusCode == 200 && res.data != null) {
         final List<dynamic> raw = res.data['reviews'] is List ? res.data['reviews'] : [];
         final List<Map<String, dynamic>> parsed = [];
@@ -375,17 +375,24 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                               }
 
                               setModalState(() => isSubmitting = true);
-                              final currentName = await _storage.read(key: 'patientName') ?? 'Verified Patient';
-                              final currentMobile = await _storage.read(key: 'userMobile') ?? '';
+                              final rawStoredMob = await _storage.read(key: 'userMobile') ?? '';
+                              String cleanMob = rawStoredMob.replaceAll(RegExp(r'^\+91|\D'), '').trim();
+                              if (cleanMob.length > 10) cleanMob = cleanMob.substring(cleanMob.length - 10);
+
+                              final storedName = (await _storage.read(key: 'patientName_$cleanMob')) ??
+                                  (await _storage.read(key: 'patientName_+91$cleanMob')) ??
+                                  (await _storage.read(key: 'patientName')) ?? '';
+                              final currentName = storedName.trim().isNotEmpty ? storedName.trim() : 'Verified Patient';
+                              final currentMobile = cleanMob.isNotEmpty ? '+91$cleanMob' : rawStoredMob;
 
                               final newReview = {
-                                'name': currentName.isNotEmpty ? currentName : 'Verified Patient',
+                                'name': currentName,
                                 'rating': selectedRating,
                                 'date': 'Just now',
                                 'treatment': selectedTreatment,
                                 'visitType': 'Verified Patient Review',
                                 'comment': text,
-                                'doctor': 'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar',
+                                'doctor': 'QuickPhysio24 Specialist (Dr. Rajnish Bariyar & Dr. Priyanka Bariyar)',
                                 'isVerified': true,
                               };
 
@@ -394,7 +401,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                                   'rating': selectedRating,
                                   'comment': text,
                                   'treatment': selectedTreatment,
-                                  'patientName': currentName.isNotEmpty ? currentName : 'Verified Patient',
+                                  'patientName': currentName,
                                   'patientMobile': currentMobile,
                                 });
                               } catch (e) {

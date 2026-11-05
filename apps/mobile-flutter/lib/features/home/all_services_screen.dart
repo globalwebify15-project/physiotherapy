@@ -838,14 +838,22 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
-                    final servTitle = service['title'] ?? '';
-                    final servDoc = service['doctor'] ?? '';
-                    final docId = servDoc.toString().toLowerCase().contains('priyanka') ? 'dr_priyanka' : 'dr_rajnish';
+                    final servTitle = (service['title'] ?? '').toString();
+                    final servDoc = (service['doctor'] ?? '').toString();
+                    final docId = servDoc.toLowerCase().contains('priyanka') ? 'dr_priyanka' : 'dr_rajnish';
+                    String? servId = service['_id']?.toString();
+                    if (servId == null || servId.isEmpty) {
+                      final match = _catalogServices.firstWhere(
+                        (s) => s['_id'] != null && s['title']?.toString().toLowerCase().contains(servTitle.toLowerCase()) == true,
+                        orElse: () => {},
+                      );
+                      if (match.isNotEmpty) servId = match['_id']?.toString();
+                    }
                     Navigator.pop(context);
                     context.push(
                       '/booking',
                       extra: {
-                        'serviceId': service['_id']?.toString(),
+                        'serviceId': servId,
                         'serviceTitle': servTitle,
                         'doctorId': docId,
                         'doctorName': servDoc,

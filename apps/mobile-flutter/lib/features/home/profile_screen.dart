@@ -134,21 +134,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // 2. Refresh from backend API
     try {
+      final cleanMob = currentMobile.replaceAll(RegExp(r'^\+91|\D'), '').trim();
       final response = await _apiService.get('/patients');
-      if (response.statusCode == 200 && response.data['patient'] != null) {
-        final patient = response.data['patient'];
-        final fetchedName = patient['name'] ?? '';
-        final fetchedMobile = patient['userId'] is Map ? (patient['userId']['mobile'] ?? currentMobile) : currentMobile;
-        final fetchedEmail = patient['userId'] is Map ? (patient['userId']['email'] ?? '') : '';
-        final photo = patient['profilePhoto']?.toString() ?? '';
-        final addr = patient['address'] ?? '';
-        final gender = patient['gender'] ?? 'male';
-        final dob = patient['dob'] ?? '';
+      Map<String, dynamic>? patient;
+      if (response.statusCode == 200 && response.data != null) {
+        if (response.data['patient'] is Map) {
+          patient = Map<String, dynamic>.from(response.data['patient']);
+        } else if (response.data['patients'] is List && (response.data['patients'] as List).isNotEmpty) {
+          final list = response.data['patients'] as List;
+          final match = list.firstWhere(
+            (p) => p is Map && (p['userId'] is Map && (p['userId']['mobile'] ?? '').toString().contains(cleanMob)),
+            orElse: () => list.first,
+          );
+          if (match is Map) patient = Map<String, dynamic>.from(match);
+        }
+      }
+
+      if (patient != null) {
+        final p = patient;
+        final fetchedName = p['name'] ?? '';
+        final fetchedMobile = p['userId'] is Map ? (p['userId']['mobile'] ?? currentMobile) : (p['mobile'] ?? currentMobile);
+        final fetchedEmail = p['userId'] is Map ? (p['userId']['email'] ?? '') : (p['email'] ?? '');
+        final photo = p['profilePhoto']?.toString() ?? '';
+        final addr = p['address'] ?? '';
+        final gender = p['gender'] ?? 'male';
+        final dob = p['dob'] ?? '';
 
         String ecFormatted = '';
-        if (patient['emergencyContact'] is Map) {
-          final ecName = patient['emergencyContact']['name'] ?? '';
-          final ecPhone = patient['emergencyContact']['phone'] ?? '';
+        if (p['emergencyContact'] is Map) {
+          final ecName = p['emergencyContact']['name'] ?? '';
+          final ecPhone = p['emergencyContact']['phone'] ?? '';
           if (ecName.isNotEmpty) ecFormatted = ecPhone.isNotEmpty ? '$ecName ($ecPhone)' : ecName;
         }
 
@@ -170,8 +185,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _gender = gender;
             _dob = dob;
             if (ecFormatted.isNotEmpty) _emergencyContact = ecFormatted;
-            if (patient['medicalHistory'] != null) {
-              _medicalHistory = List<String>.from(patient['medicalHistory']);
+            if (p['medicalHistory'] != null && p['medicalHistory'] is List) {
+              _medicalHistory = List<String>.from(p['medicalHistory']);
             }
             _isLoading = false;
           });
