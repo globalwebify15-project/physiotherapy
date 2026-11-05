@@ -212,13 +212,18 @@ class _BookingScreenState extends State<BookingScreen> {
   num _getBasePrice() {
     if (_selectedServiceId == null) return 0;
     final selectedService = _services.firstWhere(
-      (s) => s['_id']?.toString() == _selectedServiceId?.toString(),
+      (s) => s is Map && s['_id']?.toString() == _selectedServiceId?.toString(),
       orElse: () => null,
     );
-    if (selectedService == null) return 0;
-    final num? home = selectedService['pricingHome'] ?? selectedService['homePrice'];
-    final num? clinic = selectedService['pricingClinic'] ?? selectedService['clinicPrice'];
-    return _selectedVisitType == 'home' ? (home ?? 950) : (clinic ?? 650);
+    if (selectedService == null || selectedService is! Map) return 0;
+
+    final rawHome = selectedService['pricingHome'] ?? selectedService['homePrice'];
+    final rawClinic = selectedService['pricingClinic'] ?? selectedService['clinicPrice'];
+
+    final num home = (rawHome is num) ? rawHome : (num.tryParse(rawHome?.toString() ?? '') ?? 950);
+    final num clinic = (rawClinic is num) ? rawClinic : (num.tryParse(rawClinic?.toString() ?? '') ?? 650);
+
+    return _selectedVisitType == 'home' ? home : clinic;
   }
 
   num _getDiscountAmount() {
@@ -237,7 +242,8 @@ class _BookingScreenState extends State<BookingScreen> {
       return discountValue > basePrice ? basePrice : discountValue;
     } else {
       // Percentage
-      return (basePrice * discountValue) / 100;
+      final calculated = (basePrice * discountValue) / 100;
+      return calculated > basePrice ? basePrice : calculated;
     }
   }
 
@@ -245,7 +251,10 @@ class _BookingScreenState extends State<BookingScreen> {
     final basePrice = _getBasePrice();
     if (basePrice <= 0) return 0;
     final discount = _getDiscountAmount();
-    return (basePrice - discount).clamp(0, basePrice);
+    num total = basePrice - discount;
+    if (total < 0) total = 0;
+    if (total > basePrice) total = basePrice;
+    return total;
   }
 
   void _applyPromoCode() {
@@ -603,7 +612,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
     final selectedService = _services.firstWhere(
-      (s) => s['_id'] == _selectedServiceId,
+      (s) => s is Map && s['_id']?.toString() == _selectedServiceId?.toString(),
       orElse: () => {'title': 'Physiotherapy Consultation'},
     );
 
@@ -811,56 +820,74 @@ class _BookingScreenState extends State<BookingScreen> {
                             ],
                           ),
                           child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: (_selectedServiceId != null && _services.any((s) => s['_id']?.toString() == _selectedServiceId.toString()))
-                                  ? _selectedServiceId
-                                  : null,
-                              hint: const Text(
-                                'Choose Treatment Service / सेवा चुनें *',
-                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF94A3B8)),
-                              ),
-                              icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F766E)),
-                              items: _services.map<DropdownMenuItem<String>>((service) {
-                                final sId = service['_id']?.toString();
-                                final sPrice = _selectedVisitType == 'home'
-                                    ? (service['homePrice'] ?? service['pricingHome'] ?? 950)
-                                    : (service['clinicPrice'] ?? service['pricingClinic'] ?? 650);
-                                return DropdownMenuItem<String>(
-                                  value: sId,
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          service['title'] ?? 'Service',
-                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                                          overflow: TextOverflow.ellipsis,
+                            child: Builder(
+                              builder: (context) {
+                                final seenServiceIds = <String>{};
+                                final dropdownItems = <DropdownMenuItem<String>>[];
+                                for (final service in _services) {
+                                  if (service is Map) {
+                                    final sId = service['_id']?.toString();
+                                    if (sId != null && sId.isNotEmpty && !seenServiceIds.contains(sId)) {
+                                      seenServiceIds.add(sId);
+                                      final rawHome = service['homePrice'] ?? service['pricingHome'];
+                                      final rawClinic = service['clinicPrice'] ?? service['pricingClinic'];
+                                      final num sPrice = _selectedVisitType == 'home'
+                                          ? ((rawHome is num) ? rawHome : (num.tryParse(rawHome?.toString() ?? '') ?? 950))
+                                          : ((rawClinic is num) ? rawClinic : (num.tryParse(rawClinic?.toString() ?? '') ?? 650));
+                                      dropdownItems.add(
+                                        DropdownMenuItem<String>(
+                                          value: sId,
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  service['title']?.toString() ?? 'Service',
+                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                '₹$sPrice',
+                                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F766E)),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '₹$sPrice',
-                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F766E)),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setState(() {
-                                  _selectedServiceId = val;
-                                  _showServiceValidationError = false;
-                                  if (_promoController.text.trim().isNotEmpty && _appliedCoupon == null) {
-                                    _applyPromoCode();
-                                  } else if (_appliedCoupon != null) {
-                                    final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
-                                    final basePrice = _getBasePrice();
-                                    if (minAmount > 0 && basePrice < minAmount) {
-                                      _appliedCoupon = null;
-                                      _promoError = 'Coupon removed: requires min booking of ₹$minAmount.';
+                                      );
                                     }
                                   }
-                                });
+                                }
+
+                                final currentVal = (_selectedServiceId != null && seenServiceIds.contains(_selectedServiceId))
+                                    ? _selectedServiceId
+                                    : null;
+
+                                return DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: currentVal,
+                                  hint: const Text(
+                                    'Choose Treatment Service / सेवा चुनें *',
+                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF94A3B8)),
+                                  ),
+                                  icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F766E)),
+                                  items: dropdownItems,
+                                  onChanged: (val) {
+                                    if (val == null) return;
+                                    setState(() {
+                                      _selectedServiceId = val;
+                                      _showServiceValidationError = false;
+                                      if (_appliedCoupon != null) {
+                                        final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
+                                        final basePrice = _getBasePrice();
+                                        if (minAmount > 0 && basePrice < minAmount) {
+                                          _appliedCoupon = null;
+                                          _promoError = 'Coupon removed: requires min booking of ₹$minAmount.';
+                                        }
+                                      }
+                                    });
+                                  },
+                                );
                               },
                             ),
                           ),
