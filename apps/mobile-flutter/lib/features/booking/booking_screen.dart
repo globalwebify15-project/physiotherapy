@@ -66,12 +66,13 @@ class _BookingScreenState extends State<BookingScreen> {
   ];
   Set<String> _bookedSlots = {};
 
-  String? _selectedServiceId = '1';
+  String? _selectedServiceId;
   String? _selectedTherapistId = 'dr_rajnish';
   String _selectedVisitType = 'clinic';
   String _selectedPaymentMethod = 'online'; // 'online' or 'clinic'
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  String? _selectedSlot = '10:00 AM';
+  String? _selectedSlot;
+  bool _showServiceValidationError = false;
   final _addressController = TextEditingController();
 
   late Razorpay _razorpay;
@@ -198,7 +199,9 @@ class _BookingScreenState extends State<BookingScreen> {
         });
         if (widget.initialPromoCode != null && widget.initialPromoCode!.trim().isNotEmpty) {
           _promoController.text = widget.initialPromoCode!.trim().toUpperCase();
-          _applyPromoCode();
+          if (_selectedServiceId != null) {
+            _applyPromoCode();
+          }
         }
       }
     } catch (e) {
@@ -207,24 +210,21 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   num _getBasePrice() {
+    if (_selectedServiceId == null) return 0;
     final selectedService = _services.firstWhere(
       (s) => s['_id']?.toString() == _selectedServiceId?.toString(),
-      orElse: () => {
-        '_id': '1',
-        'title': 'Physiotherapy Consultation',
-        'homePrice': 950,
-        'clinicPrice': 650
-      },
+      orElse: () => null,
     );
-    final num price = _selectedVisitType == 'home'
-        ? (selectedService['homePrice'] ?? 950)
-        : (selectedService['clinicPrice'] ?? 650);
-    return price;
+    if (selectedService == null) return 0;
+    final num? home = selectedService['pricingHome'] ?? selectedService['homePrice'];
+    final num? clinic = selectedService['pricingClinic'] ?? selectedService['clinicPrice'];
+    return _selectedVisitType == 'home' ? (home ?? 950) : (clinic ?? 650);
   }
 
   num _getDiscountAmount() {
     if (_appliedCoupon == null) return 0;
     final basePrice = _getBasePrice();
+    if (basePrice <= 0) return 0;
     final discountType = (_appliedCoupon!['discountType'] ?? 'percentage').toString();
     final discountValue = num.tryParse(_appliedCoupon!['discountValue']?.toString() ?? '0') ?? 0;
     final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
@@ -243,6 +243,7 @@ class _BookingScreenState extends State<BookingScreen> {
 
   num _getTotalPayable() {
     final basePrice = _getBasePrice();
+    if (basePrice <= 0) return 0;
     final discount = _getDiscountAmount();
     return (basePrice - discount).clamp(0, basePrice);
   }
@@ -250,6 +251,13 @@ class _BookingScreenState extends State<BookingScreen> {
   void _applyPromoCode() {
     final code = _promoController.text.trim().toUpperCase();
     if (code.isEmpty) return;
+
+    if (_selectedServiceId == null) {
+      setState(() {
+        _promoError = 'Please select a treatment service first before applying promo code.';
+      });
+      return;
+    }
 
     final match = _availableOffers.firstWhere(
       (o) => (o['code'] ?? '').toString().toUpperCase() == code,
@@ -269,7 +277,7 @@ class _BookingScreenState extends State<BookingScreen> {
     if (minAmount > 0 && basePrice < minAmount) {
       setState(() {
         _appliedCoupon = null;
-        _promoError = 'Coupon requires minimum booking amount of ₹$minAmount.';
+        _promoError = 'Coupon requires minimum booking amount of ₹$minAmount (Selected: ₹$basePrice).';
       });
       return;
     }
@@ -321,7 +329,18 @@ class _BookingScreenState extends State<BookingScreen> {
       final therapistsRes = await _apiService.get('/therapists');
       
       setState(() {
-        _services = servicesRes.data['services'] ?? [];
+        final rawServices = (servicesRes.data['services'] as List? ?? []);
+        _services = rawServices.map((s) {
+          final m = Map<String, dynamic>.from(s as Map);
+          final num cPrice = m['pricingClinic'] ?? m['clinicPrice'] ?? 650;
+          final num hPrice = m['pricingHome'] ?? m['homePrice'] ?? 950;
+          m['clinicPrice'] = cPrice;
+          m['homePrice'] = hPrice;
+          m['pricingClinic'] = cPrice;
+          m['pricingHome'] = hPrice;
+          return m;
+        }).toList();
+
         if (therapistsRes.data['therapists'] != null && (therapistsRes.data['therapists'] as List).isNotEmpty) {
           _therapists = therapistsRes.data['therapists'];
           
@@ -348,18 +367,25 @@ class _BookingScreenState extends State<BookingScreen> {
             _selectedTherapistId = _therapists[0]['_id']?.toString();
           }
         }
-        if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
+        if (widget.initialServiceId != null && widget.initialServiceId!.isNotEmpty) {
+          final matched = _services.firstWhere(
+            (s) => s['_id']?.toString() == widget.initialServiceId?.toString(),
+            orElse: () => null,
+          );
+          if (matched != null) {
+            _selectedServiceId = matched['_id']?.toString();
+          }
+        } else if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
           final matched = _services.firstWhere(
             (s) => s['title'] != null && s['title'].toString().toLowerCase().contains(widget.initialServiceTitle!.toLowerCase()),
             orElse: () => null,
           );
           if (matched != null) {
-            _selectedServiceId = matched['_id'];
+            _selectedServiceId = matched['_id']?.toString();
           }
         }
-        if (_selectedServiceId == null && _services.isNotEmpty) {
-          _selectedServiceId = _services[0]['_id'] ?? '1';
-        }
+        // Deliberately keep _selectedServiceId as null if no initial selection was passed,
+        // ensuring user is strictly validated to choose a service.
         _isLoading = false;
       });
       _fetchAvailableSlots();
@@ -367,33 +393,38 @@ class _BookingScreenState extends State<BookingScreen> {
       // Fallback default services if network is offline
       setState(() {
         _services = [
-          {'_id': '1', 'title': 'Stroke / Paralysis', 'homePrice': 1200, 'clinicPrice': 800},
-          {'_id': '2', 'title': "Parkinson's / Alzheimer's", 'homePrice': 1200, 'clinicPrice': 800},
-          {'_id': '3', 'title': "Facial / Bell's Palsy", 'homePrice': 1000, 'clinicPrice': 700},
-          {'_id': '4', 'title': 'Vestibular Dysfunction', 'homePrice': 1100, 'clinicPrice': 750},
-          {'_id': '5', 'title': 'Cervical Spondylosis', 'homePrice': 950, 'clinicPrice': 650},
-          {'_id': '6', 'title': 'Lumbar Spondylosis', 'homePrice': 950, 'clinicPrice': 650},
-          {'_id': '7', 'title': 'OA (Knee Pain)', 'homePrice': 950, 'clinicPrice': 650},
-          {'_id': '8', 'title': "Tennis / Golfer's Elbow", 'homePrice': 900, 'clinicPrice': 600},
-          {'_id': '9', 'title': 'Frozen Shoulder', 'homePrice': 950, 'clinicPrice': 650},
-          {'_id': '10', 'title': 'CP Child', 'homePrice': 1300, 'clinicPrice': 850},
-          {'_id': '11', 'title': 'Developmental Delay', 'homePrice': 1200, 'clinicPrice': 800},
-          {'_id': '12', 'title': 'Autism', 'homePrice': 1300, 'clinicPrice': 850},
-          {'_id': '13', 'title': 'Prenatal & Postnatal Physiotherapy', 'homePrice': 1100, 'clinicPrice': 750},
-          {'_id': '14', 'title': 'Knee / Hip Replacement Rehab', 'homePrice': 1350, 'clinicPrice': 900},
-          {'_id': '15', 'title': 'Sports Injury Management', 'homePrice': 1250, 'clinicPrice': 850},
+          {'_id': '1', 'title': 'Stroke / Paralysis', 'pricingHome': 1200, 'pricingClinic': 800, 'homePrice': 1200, 'clinicPrice': 800},
+          {'_id': '2', 'title': "Parkinson's / Alzheimer's", 'pricingHome': 1200, 'pricingClinic': 800, 'homePrice': 1200, 'clinicPrice': 800},
+          {'_id': '3', 'title': "Facial / Bell's Palsy", 'pricingHome': 1000, 'pricingClinic': 700, 'homePrice': 1000, 'clinicPrice': 700},
+          {'_id': '4', 'title': 'Vestibular Dysfunction', 'pricingHome': 1100, 'pricingClinic': 750, 'homePrice': 1100, 'clinicPrice': 750},
+          {'_id': '5', 'title': 'Cervical Spondylosis', 'pricingHome': 950, 'pricingClinic': 650, 'homePrice': 950, 'clinicPrice': 650},
+          {'_id': '6', 'title': 'Lumbar Spondylosis', 'pricingHome': 950, 'pricingClinic': 650, 'homePrice': 950, 'clinicPrice': 650},
+          {'_id': '7', 'title': 'OA (Knee Pain)', 'pricingHome': 950, 'pricingClinic': 650, 'homePrice': 950, 'clinicPrice': 650},
+          {'_id': '8', 'title': "Tennis / Golfer's Elbow", 'pricingHome': 900, 'pricingClinic': 600, 'homePrice': 900, 'clinicPrice': 600},
+          {'_id': '9', 'title': 'Frozen Shoulder', 'pricingHome': 950, 'pricingClinic': 650, 'homePrice': 950, 'clinicPrice': 650},
+          {'_id': '10', 'title': 'CP Child', 'pricingHome': 1300, 'pricingClinic': 850, 'homePrice': 1300, 'clinicPrice': 850},
+          {'_id': '11', 'title': 'Developmental Delay', 'pricingHome': 1200, 'pricingClinic': 800, 'homePrice': 1200, 'clinicPrice': 800},
+          {'_id': '12', 'title': 'Autism', 'pricingHome': 1300, 'pricingClinic': 850, 'homePrice': 1300, 'clinicPrice': 850},
+          {'_id': '13', 'title': 'Prenatal & Postnatal Physiotherapy', 'pricingHome': 1100, 'pricingClinic': 750, 'homePrice': 1100, 'clinicPrice': 750},
+          {'_id': '14', 'title': 'Knee / Hip Replacement Rehab', 'pricingHome': 1350, 'pricingClinic': 900, 'homePrice': 1350, 'clinicPrice': 900},
+          {'_id': '15', 'title': 'Sports Injury Management', 'pricingHome': 1250, 'pricingClinic': 850, 'homePrice': 1250, 'clinicPrice': 850},
         ];
-        if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
+        if (widget.initialServiceId != null && widget.initialServiceId!.isNotEmpty) {
+          final matched = _services.firstWhere(
+            (s) => s['_id']?.toString() == widget.initialServiceId?.toString(),
+            orElse: () => null,
+          );
+          if (matched != null) {
+            _selectedServiceId = matched['_id']?.toString();
+          }
+        } else if (widget.initialServiceTitle != null && widget.initialServiceTitle!.isNotEmpty) {
           final matched = _services.firstWhere(
             (s) => s['title'] != null && s['title'].toString().toLowerCase().contains(widget.initialServiceTitle!.toLowerCase()),
             orElse: () => null,
           );
           if (matched != null) {
-            _selectedServiceId = matched['_id'];
+            _selectedServiceId = matched['_id']?.toString();
           }
-        }
-        if (_selectedServiceId == null) {
-          _selectedServiceId = '1';
         }
         _isLoading = false;
       });
@@ -501,16 +532,39 @@ class _BookingScreenState extends State<BookingScreen> {
   }
 
   Future<void> _createBooking() async {
-    if (_selectedServiceId == null) {
+    // 1. Strict Validation Checks
+    final bool isServiceSelected = _selectedServiceId != null &&
+        _selectedServiceId!.isNotEmpty &&
+        _services.any((s) => s['_id']?.toString() == _selectedServiceId.toString());
+
+    if (!isServiceSelected) {
+      setState(() => _showServiceValidationError = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a healthcare service')),
+        const SnackBar(
+          content: Text('Please select a healthcare service to proceed with booking.'),
+          backgroundColor: Color(0xFFEF4444),
+          duration: Duration(seconds: 3),
+        ),
       );
       return;
     }
 
-    if (_selectedSlot == null) {
+    if (_selectedTherapistId == null || _selectedTherapistId!.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an appointment time slot')),
+        const SnackBar(
+          content: Text('Please select a doctor/physiotherapist.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
+      );
+      return;
+    }
+
+    if (_selectedSlot == null || _selectedSlot!.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please choose an appointment time slot.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
       );
       return;
     }
@@ -527,7 +581,10 @@ class _BookingScreenState extends State<BookingScreen> {
 
     if (_selectedVisitType == 'home' && _addressController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter delivery address for home visit')),
+        const SnackBar(
+          content: Text('Please enter your complete address for home consultation.'),
+          backgroundColor: Color(0xFFEF4444),
+        ),
       );
       return;
     }
@@ -611,14 +668,19 @@ class _BookingScreenState extends State<BookingScreen> {
                 !orderId.contains('sandbox') &&
                 !orderId.contains('mock');
 
+            final cleanContact = userMobile.replaceAll(RegExp(r'^\+91|\D'), '');
+            final paymentDesc = _appliedCoupon != null
+                ? 'Booking: ${selectedService['title']} (Coupon: ${_appliedCoupon!['code']} - Saved ₹${discount.toStringAsFixed(0)})'
+                : 'Booking: ${selectedService['title']}';
+
             var options = <String, dynamic>{
               'key': keyId,
               'amount': amount,
-              'name': 'QuickPhysio24',
-              'description': 'Booking: ${selectedService['title']}',
+              'name': 'QuickPhysio24.com',
+              'description': paymentDesc,
               'timeout': 300,
               'prefill': {
-                'contact': userMobile.isNotEmpty ? userMobile : '9876543210',
+                'contact': cleanContact.length == 10 ? cleanContact : (userMobile.isNotEmpty ? userMobile : '9876543210'),
                 'email': userEmail.isNotEmpty ? userEmail : 'patient@quickphysio24.com',
                 'name': userName.isNotEmpty ? userName : 'Patient',
               },
@@ -706,9 +768,29 @@ class _BookingScreenState extends State<BookingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Service Selector
-                        const Text(
-                          'Select Service / सेवा चुनें',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Select Treatment Service *',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            if (_selectedServiceId != null)
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _selectedServiceId = null;
+                                    _appliedCoupon = null;
+                                  });
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Container(
@@ -716,7 +798,10 @@ class _BookingScreenState extends State<BookingScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            border: Border.all(
+                              color: _showServiceValidationError ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0),
+                              width: _showServiceValidationError ? 1.8 : 1.0,
+                            ),
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.015),
@@ -728,23 +813,72 @@ class _BookingScreenState extends State<BookingScreen> {
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<String>(
                               isExpanded: true,
-                              value: _selectedServiceId,
+                              value: (_selectedServiceId != null && _services.any((s) => s['_id']?.toString() == _selectedServiceId.toString()))
+                                  ? _selectedServiceId
+                                  : null,
+                              hint: const Text(
+                                'Choose Treatment Service / सेवा चुनें *',
+                                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF94A3B8)),
+                              ),
                               icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F766E)),
                               items: _services.map<DropdownMenuItem<String>>((service) {
+                                final sId = service['_id']?.toString();
+                                final sPrice = _selectedVisitType == 'home'
+                                    ? (service['homePrice'] ?? service['pricingHome'] ?? 950)
+                                    : (service['clinicPrice'] ?? service['pricingClinic'] ?? 650);
                                 return DropdownMenuItem<String>(
-                                  value: service['_id'],
-                                  child: Text(
-                                    service['title'] ?? 'Service',
-                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                  value: sId,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          service['title'] ?? 'Service',
+                                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '₹$sPrice',
+                                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F766E)),
+                                      ),
+                                    ],
                                   ),
                                 );
                               }).toList(),
                               onChanged: (val) {
-                                setState(() => _selectedServiceId = val);
+                                setState(() {
+                                  _selectedServiceId = val;
+                                  _showServiceValidationError = false;
+                                  if (_promoController.text.trim().isNotEmpty && _appliedCoupon == null) {
+                                    _applyPromoCode();
+                                  } else if (_appliedCoupon != null) {
+                                    final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
+                                    final basePrice = _getBasePrice();
+                                    if (minAmount > 0 && basePrice < minAmount) {
+                                      _appliedCoupon = null;
+                                      _promoError = 'Coupon removed: requires min booking of ₹$minAmount.';
+                                    }
+                                  }
+                                });
                               },
                             ),
                           ),
                         ),
+                        if (_showServiceValidationError)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6, left: 4),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Please choose a service to continue booking',
+                                  style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
                         const SizedBox(height: 20),
 
                         // Doctor Selector
@@ -1235,63 +1369,82 @@ class _BookingScreenState extends State<BookingScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    _selectedVisitType == 'home' ? 'Home Visit Consultation' : 'Clinic Consultation Fee',
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                              if (_selectedServiceId == null) ...[
+                                const Center(
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.touch_app_rounded, color: Color(0xFF0F766E), size: 18),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Select a treatment service above to view pricing & fees',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  Text(
-                                    '₹${_getBasePrice().toStringAsFixed(0)}',
-                                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Platform & Appointment Fee',
-                                    style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
-                                  ),
-                                  Text(
-                                    'FREE',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
-                                  ),
-                                ],
-                              ),
-                              if (_appliedCoupon != null && _getDiscountAmount() > 0) ...[
-                                const SizedBox(height: 8),
+                                ),
+                              ] else ...[
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
-                                      'Coupon Discount (${_appliedCoupon!['code']})',
-                                      style: const TextStyle(fontSize: 13, color: Color(0xFF0F766E), fontWeight: FontWeight.w600),
+                                      _selectedVisitType == 'home' ? 'Home Visit Consultation' : 'Clinic Consultation Fee',
+                                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
                                     ),
                                     Text(
-                                      '-₹${_getDiscountAmount().toStringAsFixed(0)}',
-                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                                      '₹${_getBasePrice().toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 8),
+                                const Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Platform & Appointment Fee',
+                                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                    ),
+                                    Text(
+                                      'FREE',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF10B981)),
+                                    ),
+                                  ],
+                                ),
+                                if (_appliedCoupon != null && _getDiscountAmount() > 0) ...[
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        'Coupon Discount (${_appliedCoupon!['code']})',
+                                        style: const TextStyle(fontSize: 13, color: Color(0xFF0F766E), fontWeight: FontWeight.w600),
+                                      ),
+                                      Text(
+                                        '-₹${_getDiscountAmount().toStringAsFixed(0)}',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                                const Divider(height: 20, color: Color(0xFFE2E8F0)),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Text(
+                                      'Total Payable Amount',
+                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                                    ),
+                                    Text(
+                                      '₹${_getTotalPayable().toStringAsFixed(0)}',
+                                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F766E)),
                                     ),
                                   ],
                                 ),
                               ],
-                              const Divider(height: 20, color: Color(0xFFE2E8F0)),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text(
-                                    'Total Payable Amount',
-                                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                                  ),
-                                  Text(
-                                    '₹${_getTotalPayable().toStringAsFixed(0)}',
-                                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF0F766E)),
-                                  ),
-                                ],
-                              ),
                             ],
                           ),
                         ),
@@ -1314,11 +1467,15 @@ class _BookingScreenState extends State<BookingScreen> {
                                   child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                                 )
                               : Text(
-                                  _selectedPaymentMethod == 'online'
-                                      ? 'Pay ₹${_getTotalPayable().toStringAsFixed(0)} & Book Appointment'
-                                      : _selectedVisitType == 'home'
-                                          ? 'Confirm Home Visit (Pay ₹${_getTotalPayable().toStringAsFixed(0)} at Home)'
-                                          : 'Confirm Clinic Visit (Pay ₹${_getTotalPayable().toStringAsFixed(0)} at Clinic)',
+                                  _selectedServiceId == null
+                                      ? 'Select Service to Proceed'
+                                      : _selectedSlot == null
+                                          ? 'Select Time Slot to Proceed'
+                                          : _selectedPaymentMethod == 'online'
+                                              ? 'Pay ₹${_getTotalPayable().toStringAsFixed(0)} & Book Appointment'
+                                              : _selectedVisitType == 'home'
+                                                  ? 'Confirm Home Visit (Pay ₹${_getTotalPayable().toStringAsFixed(0)} at Home)'
+                                                  : 'Confirm Clinic Visit (Pay ₹${_getTotalPayable().toStringAsFixed(0)} at Clinic)',
                                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                                   textAlign: TextAlign.center,
                                 ),

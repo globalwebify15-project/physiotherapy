@@ -17,6 +17,9 @@ export interface IAppointment extends Document {
   status: 'pending' | 'confirmed' | 'assigned' | 'in-progress' | 'completed' | 'cancelled';
   statusTimeline: IStatusTimeline[];
   paymentId?: mongoose.Types.ObjectId;
+  totalAmount?: number;
+  discount?: number;
+  couponCode?: string;
   notes?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -45,6 +48,9 @@ const AppointmentSchema: Schema = new Schema(
       },
     ],
     paymentId: { type: Schema.Types.ObjectId, ref: 'Payment' },
+    totalAmount: { type: Number },
+    discount: { type: Number, default: 0 },
+    couponCode: { type: String },
     notes: { type: String },
   },
   { timestamps: true }

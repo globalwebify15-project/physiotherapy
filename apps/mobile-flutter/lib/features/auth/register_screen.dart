@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../utils/app_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -143,8 +144,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _loadProfileData() async {
     try {
-      // First fetch stored token mobile if any
-      final storedMobile = await _storage.read(key: 'userMobile') ?? '';
+      // First fetch stored token mobile if any and clean to 10 digits
+      final rawStored = await _storage.read(key: 'userMobile') ?? '';
+      String storedMobile = rawStored.replaceAll(RegExp(r'^\+91|\D'), '').trim();
+      if (storedMobile.length > 10) storedMobile = storedMobile.substring(storedMobile.length - 10);
       _mobileController.text = storedMobile;
 
       final response = await _apiService.get('/patients');
@@ -181,8 +184,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         setState(() {
           _nameController.text = patient['name'] ?? '';
-          _mobileController.text = patient['userId'] is Map ? (patient['userId']['mobile'] ?? '') : storedMobile;
-          _emailController.text = patient['userId'] is Map ? (patient['userId']['email'] ?? '') : '';
+          final rawUserMobile = patient['userId'] is Map ? (patient['userId']['mobile'] ?? '') : (patient['mobile'] ?? storedMobile);
+          String cleanUserMob = rawUserMobile.toString().replaceAll(RegExp(r'^\+91|\D'), '').trim();
+          if (cleanUserMob.length > 10) cleanUserMob = cleanUserMob.substring(cleanUserMob.length - 10);
+          if (cleanUserMob.isNotEmpty) _mobileController.text = cleanUserMob;
+
+          _emailController.text = patient['userId'] is Map ? (patient['userId']['email'] ?? '') : (patient['email'] ?? '');
           _gender = patient['gender'] ?? 'male';
           if (patient['dob'] != null) {
             _dob = DateTime.parse(patient['dob']);
@@ -196,7 +203,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
           if (patient['emergencyContact'] != null) {
             _emergNameController.text = patient['emergencyContact']['name'] ?? '';
-            _emergPhoneController.text = patient['emergencyContact']['phone'] ?? '';
+            final rawEmerg = (patient['emergencyContact']['phone'] ?? '').toString();
+            String cleanEmerg = rawEmerg.replaceAll(RegExp(r'^\+91|\D'), '').trim();
+            if (cleanEmerg.length > 10) cleanEmerg = cleanEmerg.substring(cleanEmerg.length - 10);
+            _emergPhoneController.text = cleanEmerg;
             _emergRelationController.text = patient['emergencyContact']['relation'] ?? '';
           }
 
@@ -262,13 +272,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final name = _nameController.text.trim();
-      final mobile = _mobileController.text.trim();
+      final cleanDigits = _mobileController.text.trim().replaceAll(RegExp(r'\D'), '');
+      final mobile = cleanDigits.length == 10 ? '+91$cleanDigits' : cleanDigits;
       final email = _emailController.text.trim();
       final photo = _photoController.text.trim();
       final addresses = _addressControllers.map((c) => c.text.trim()).where((a) => a.isNotEmpty).toList();
       final mainAddr = addresses.isNotEmpty ? addresses.first : _addressController.text.trim();
       final emergName = _emergNameController.text.trim();
-      final emergPhone = _emergPhoneController.text.trim();
+      final cleanEmergDigits = _emergPhoneController.text.trim().replaceAll(RegExp(r'\D'), '');
+      final emergPhone = cleanEmergDigits.length == 10 ? '+91$cleanEmergDigits' : cleanEmergDigits;
       final emergRel = _emergRelationController.text.trim();
       final medHistoryStr = _selectedMedicalHistory.join('|||');
 
@@ -357,17 +369,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
     required String label,
     required IconData icon,
     bool readOnly = false,
+    String? prefixText,
+    int? maxLength,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       readOnly: readOnly,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      maxLength: maxLength,
       validator: validator,
       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
       decoration: InputDecoration(
+        counterText: '',
         labelText: label,
         labelStyle: const TextStyle(color: Color(0xFF94A3B8), fontWeight: FontWeight.w500),
         prefixIcon: Icon(icon, color: const Color(0xFF0F766E), size: 20),
+        prefixText: prefixText,
+        prefixStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF0F172A)),
         filled: true,
         fillColor: readOnly ? const Color(0xFFF1F5F9) : const Color(0xFFF8FAFC),
         enabledBorder: OutlineInputBorder(
@@ -377,6 +399,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: const BorderSide(color: Color(0xFF0F766E), width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
         ),
       ),
     );
@@ -440,18 +470,38 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Name
                       _buildTextField(
                         controller: _nameController,
-                        label: 'Full Name',
+                        label: 'Full Name *',
                         icon: Icons.person_outline_rounded,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Please enter your name' : null,
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return 'Please enter your full name';
+                          if (v.trim().length < 2) return 'Name must be at least 2 characters';
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
 
-                      // Mobile (Read-only)
+                      // Mobile Number - Preset +91 and strictly 10 digits
                       _buildTextField(
                         controller: _mobileController,
-                        label: 'Mobile Number',
-                        icon: Icons.phone_outlined,
-                        readOnly: true,
+                        label: 'Mobile Number *',
+                        icon: Icons.phone_iphone_rounded,
+                        prefixText: '+91 ',
+                        maxLength: 10,
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Please enter 10-digit mobile number';
+                          }
+                          final digits = v.replaceAll(RegExp(r'\D'), '');
+                          if (digits.length != 10) {
+                            return 'Mobile number must be exactly 10 digits';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -460,6 +510,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         controller: _emailController,
                         label: 'Email Address',
                         icon: Icons.email_outlined,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (v) {
+                          if (v != null && v.trim().isNotEmpty) {
+                            final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                            if (!emailRegex.hasMatch(v.trim())) {
+                              return 'Please enter a valid email address';
+                            }
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 16),
 
@@ -683,26 +743,42 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         }).toList(),
                       ),
 
-                      _buildSectionTitle('Emergency Contact'),
+                      _buildSectionTitle('Emergency Contact Details'),
                       _buildTextField(
                         controller: _emergNameController,
-                        label: 'Contact Name',
+                        label: 'Contact Person Name *',
                         icon: Icons.contact_emergency_outlined,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Please enter contact person name' : null,
                       ),
                       const SizedBox(height: 12),
                       _buildTextField(
                         controller: _emergPhoneController,
-                        label: 'Contact Mobile',
-                        icon: Icons.phone_android_rounded,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                        label: 'Emergency Mobile *',
+                        icon: Icons.phone_iphone_rounded,
+                        prefixText: '+91 ',
+                        maxLength: 10,
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                          LengthLimitingTextInputFormatter(10),
+                        ],
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Please enter 10-digit emergency contact';
+                          }
+                          final digits = v.replaceAll(RegExp(r'\D'), '');
+                          if (digits.length != 10) {
+                            return 'Emergency phone must be exactly 10 digits';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       _buildTextField(
                         controller: _emergRelationController,
-                        label: 'Relationship (e.g. Spouse)',
+                        label: 'Relationship (e.g. Spouse, Parent, Self) *',
                         icon: Icons.people_outline_rounded,
-                        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Please specify relationship' : null,
                       ),
 
                       Row(

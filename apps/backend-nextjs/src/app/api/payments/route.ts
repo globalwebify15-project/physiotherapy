@@ -24,9 +24,13 @@ export async function POST(request: NextRequest) {
       appointment = await Appointment.findById(appointmentId).populate('serviceId');
     }
 
-    // Determine amount
-    let amount = customAmount || 650;
-    if (appointment?.serviceId) {
+    // Determine amount respecting customAmount (with coupon discount) or appointment totalAmount
+    let amount = 650;
+    if (customAmount !== undefined && customAmount !== null && Number(customAmount) > 0) {
+      amount = Number(customAmount);
+    } else if (appointment?.totalAmount && Number(appointment.totalAmount) > 0) {
+      amount = Number(appointment.totalAmount);
+    } else if (appointment?.serviceId) {
       const service = appointment.serviceId as any;
       amount = appointment.visitType === 'home' ? (service.pricingHome || 950) : (service.pricingClinic || 650);
     }

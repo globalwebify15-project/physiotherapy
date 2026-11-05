@@ -76,6 +76,9 @@ export async function POST(request: NextRequest) {
       patientIdOverride,
       mobile: bodyMobile,
       patientName: bodyPatientName,
+      couponCode,
+      discount,
+      totalAmount,
     } = body;
 
     if (!serviceId || !date || !timeSlot || !visitType) {
@@ -196,9 +199,14 @@ export async function POST(request: NextRequest) {
       noteText = 'Booking created. Awaiting online payment via Razorpay.';
     }
 
-    const calculatedFee = visitType === 'home'
+    const baseFee = visitType === 'home'
       ? (service.pricingHome || 950)
       : (service.pricingClinic || 650);
+
+    const discountAmount = discount && Number(discount) > 0 ? Number(discount) : 0;
+    const calculatedFee = (totalAmount !== undefined && totalAmount !== null && Number(totalAmount) >= 0)
+      ? Number(totalAmount)
+      : Math.max(0, baseFee - discountAmount);
 
     // Create appointment in MongoDB
     const appointment = await Appointment.create({
@@ -211,6 +219,9 @@ export async function POST(request: NextRequest) {
       address,
       status: initialStatus,
       statusTimeline: [{ status: initialStatus, note: noteText }],
+      totalAmount: calculatedFee,
+      discount: discountAmount,
+      couponCode: couponCode || undefined,
       notes
     });
 

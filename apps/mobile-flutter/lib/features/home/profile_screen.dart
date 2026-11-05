@@ -37,6 +37,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfile();
   }
 
+  String _formattedMobile() {
+    if (_mobile.isEmpty) return 'No mobile linked';
+    final clean = _mobile.replaceAll(RegExp(r'^\+91|\D'), '').trim();
+    return clean.isNotEmpty ? '+91 $clean' : _mobile;
+  }
+
   /// Calculates dynamic profile completion percentage strictly based on filled fields
   int _calculateProfileCompletion() {
     int score = 0;
@@ -724,7 +730,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 ),
                                 const SizedBox(height: 3),
                                 Text(
-                                  _mobile.isNotEmpty ? '+91 $_mobile' : '+91 93343 06358',
+                                  _formattedMobile(),
                                   style: const TextStyle(fontSize: 13, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
                                 ),
                                 const SizedBox(height: 14),
