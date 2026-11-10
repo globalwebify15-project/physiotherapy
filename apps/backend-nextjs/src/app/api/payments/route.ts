@@ -4,8 +4,8 @@ import { getAuthenticatedUser } from '@/utils/auth';
 import Razorpay from 'razorpay';
 import mongoose from 'mongoose';
 
-const keyId = (process.env.RAZORPAY_KEY_ID || 'rzp_test_TtdXW7UMYbdFAC').replace(/["']/g, '').trim();
-const keySecret = (process.env.RAZORPAY_KEY_SECRET || 'hk4WnpbdCMVTU28XYKntNLn2').replace(/["']/g, '').trim();
+const keyId = (process.env.RAZORPAY_KEY_ID || 'rzp_test_TssirY8P33aIzy').replace(/["']/g, '').trim();
+const keySecret = (process.env.RAZORPAY_KEY_SECRET || 'ihITDpJI24hbKHgQYAYKtj9D').replace(/["']/g, '').trim();
 
 // POST /api/payments - Initiate Razorpay Payment Order
 export async function POST(request: NextRequest) {
@@ -55,8 +55,11 @@ export async function POST(request: NextRequest) {
         realOrderId = order.id;
       }
     } catch (rzpError: any) {
-      console.warn('[RAZORPAY ORDER WARNING]: Direct order create failed, falling back to direct checkout:', rzpError?.message || rzpError);
-      // realOrderId remains null so Razorpay Flutter SDK will open in direct checkout mode rather than erroring out
+      console.error('[RAZORPAY ORDER ERROR]: Order creation failed:', rzpError?.error || rzpError?.message || rzpError);
+      return NextResponse.json({
+        error: `Razorpay Order Error: ${rzpError?.error?.description || rzpError?.message || 'Failed to initialize payment gateway order'}`,
+        details: rzpError?.error || rzpError?.message,
+      }, { status: 400 });
     }
 
     // Create Payment record

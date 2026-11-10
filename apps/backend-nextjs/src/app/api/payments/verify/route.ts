@@ -5,7 +5,7 @@ import { createNotification } from '@/utils/notifications';
 import { sendPaymentInvoiceEmail, sendBookingConfirmationEmails } from '@/utils/mailer';
 import mongoose from 'mongoose';
 
-const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || 'hk4WnpbdCMVTU28XYKntNLn2').replace(/["']/g, '').trim();
+const RAZORPAY_KEY_SECRET = (process.env.RAZORPAY_KEY_SECRET || 'ihITDpJI24hbKHgQYAYKtj9D').replace(/["']/g, '').trim();
 
 // POST /api/payments/verify - Verify Razorpay payment signature
 export async function POST(request: NextRequest) {

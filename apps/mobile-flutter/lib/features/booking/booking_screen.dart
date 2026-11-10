@@ -766,13 +766,26 @@ class _BookingScreenState extends State<BookingScreen> {
             final amount = (payData['amount'] is num)
                 ? (payData['amount'] as num).toInt()
                 : (finalPayable * 100).toInt();
-            final keyId = payData['keyId']?.toString() ?? 'rzp_test_TtdXW7UMYbdFAC';
+            final keyId = payData['keyId']?.toString() ?? 'rzp_test_TssirY8P33aIzy';
 
-            // Only attach order_id if it's a real order id from Razorpay server
+            // Attach order_id from Razorpay server
             final bool isRealRazorpayOrder = orderId != null &&
                 orderId.startsWith('order_') &&
                 !orderId.contains('sandbox') &&
                 !orderId.contains('mock');
+
+            if (!isRealRazorpayOrder) {
+              if (mounted) {
+                setState(() => _isBookingSubmitting = false);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(payData['error']?.toString() ?? 'Payment gateway order initialization failed. Please retry or choose Pay at Clinic.'),
+                    backgroundColor: const Color(0xFFEF4444),
+                  ),
+                );
+              }
+              return;
+            }
 
             final cleanContact = userMobile.replaceAll(RegExp(r'^\+91|\D'), '');
             final paymentDesc = _appliedCoupon != null
@@ -784,6 +797,7 @@ class _BookingScreenState extends State<BookingScreen> {
               'amount': amount,
               'name': 'QuickPhysio24.com',
               'description': paymentDesc,
+              'order_id': orderId,
               'timeout': 300,
               'prefill': {
                 'contact': cleanContact.length == 10 ? cleanContact : (userMobile.isNotEmpty ? userMobile : '9876543210'),
@@ -793,17 +807,7 @@ class _BookingScreenState extends State<BookingScreen> {
               'theme': {
                 'color': '#0F766E',
               },
-              'method': {
-                'netbanking': true,
-                'card': true,
-                'upi': true,
-                'wallet': true,
-              },
             };
-
-            if (isRealRazorpayOrder) {
-              options['order_id'] = orderId;
-            }
 
             _razorpay.open(options);
             return;
