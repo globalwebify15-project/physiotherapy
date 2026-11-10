@@ -108,21 +108,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _loadProfile() async {
     // 1. Load active user's mobile first
     final currentMobile = await _storage.read(key: 'userMobile') ?? '';
-    final cachedName = await _storage.read(key: 'patientName_$currentMobile') ?? await _storage.read(key: 'patientName');
-    final cachedPhoto = await _storage.read(key: 'patientPhoto_$currentMobile') ?? await _storage.read(key: 'patientPhoto');
-    final cachedEmail = await _storage.read(key: 'patientEmail_$currentMobile') ?? await _storage.read(key: 'patientEmail');
-    final cachedAddress = await _storage.read(key: 'patientAddress_$currentMobile') ?? await _storage.read(key: 'patientAddress');
-    final historyRaw = await _storage.read(key: 'patientMedicalHistory_$currentMobile') ?? await _storage.read(key: 'patientMedicalHistory');
-    final emergName = await _storage.read(key: 'emergName_$currentMobile') ?? await _storage.read(key: 'emergName');
-    final emergPhone = await _storage.read(key: 'emergPhone_$currentMobile') ?? await _storage.read(key: 'emergPhone');
+    final cleanMob = currentMobile.replaceAll(RegExp(r'^\+91|\D'), '').trim();
+    final cachedName = await _storage.read(key: 'patientName_$currentMobile') ??
+        await _storage.read(key: 'patientName_$cleanMob') ??
+        await _storage.read(key: 'patientName_+91$cleanMob') ??
+        await _storage.read(key: 'patientName');
+    final cachedPhoto = await _storage.read(key: 'patientPhoto_$currentMobile') ??
+        await _storage.read(key: 'patientPhoto_$cleanMob') ??
+        await _storage.read(key: 'patientPhoto_+91$cleanMob') ??
+        await _storage.read(key: 'patientPhoto');
+    final cachedEmail = await _storage.read(key: 'patientEmail_$currentMobile') ??
+        await _storage.read(key: 'patientEmail_$cleanMob') ??
+        await _storage.read(key: 'patientEmail_+91$cleanMob') ??
+        await _storage.read(key: 'patientEmail');
+    final cachedAddress = await _storage.read(key: 'patientAddress_$currentMobile') ??
+        await _storage.read(key: 'patientAddress_$cleanMob') ??
+        await _storage.read(key: 'patientAddress_+91$cleanMob') ??
+        await _storage.read(key: 'patientAddress');
+    final historyRaw = await _storage.read(key: 'patientMedicalHistory_$currentMobile') ??
+        await _storage.read(key: 'patientMedicalHistory_$cleanMob') ??
+        await _storage.read(key: 'patientMedicalHistory');
+    final emergName = await _storage.read(key: 'emergName_$currentMobile') ??
+        await _storage.read(key: 'emergName_$cleanMob') ??
+        await _storage.read(key: 'emergName');
+    final emergPhone = await _storage.read(key: 'emergPhone_$currentMobile') ??
+        await _storage.read(key: 'emergPhone_$cleanMob') ??
+        await _storage.read(key: 'emergPhone');
+    final cachedGender = await _storage.read(key: 'patientGender_$currentMobile') ??
+        await _storage.read(key: 'patientGender_$cleanMob') ??
+        await _storage.read(key: 'patientGender');
+    final cachedDob = await _storage.read(key: 'patientDob_$currentMobile') ??
+        await _storage.read(key: 'patientDob_$cleanMob') ??
+        await _storage.read(key: 'patientDob');
 
     if (mounted) {
       setState(() {
         if (currentMobile.isNotEmpty) _mobile = currentMobile;
-        if (cachedName != null && cachedName.isNotEmpty) _name = cachedName;
+        if (cachedName != null && cachedName.isNotEmpty && cachedName.toLowerCase() != 'patient') _name = cachedName;
         if (cachedPhoto != null && cachedPhoto.isNotEmpty) _photoUrl = cachedPhoto;
         if (cachedEmail != null && cachedEmail.isNotEmpty) _email = cachedEmail;
         if (cachedAddress != null && cachedAddress.isNotEmpty) _address = cachedAddress;
+        if (cachedGender != null && cachedGender.isNotEmpty) _gender = cachedGender;
+        if (cachedDob != null && cachedDob.isNotEmpty) _dob = cachedDob;
         if (emergName != null && emergName.isNotEmpty) {
           _emergencyContact = emergPhone != null && emergPhone.isNotEmpty ? '$emergName ($emergPhone)' : emergName;
         }
@@ -134,7 +161,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     // 2. Refresh from backend API
     try {
-      final cleanMob = currentMobile.replaceAll(RegExp(r'^\+91|\D'), '').trim();
       final response = await _apiService.get('/patients');
       Map<String, dynamic>? patient;
       if (response.statusCode == 200 && response.data != null) {
@@ -142,23 +168,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
           patient = Map<String, dynamic>.from(response.data['patient']);
         } else if (response.data['patients'] is List && (response.data['patients'] as List).isNotEmpty) {
           final list = response.data['patients'] as List;
-          final match = list.firstWhere(
-            (p) => p is Map && (p['userId'] is Map && (p['userId']['mobile'] ?? '').toString().contains(cleanMob)),
-            orElse: () => list.first,
-          );
-          if (match is Map) patient = Map<String, dynamic>.from(match);
+          Map? match;
+          for (final p in list) {
+            if (p is Map) {
+              final userMob = p['userId'] is Map ? (p['userId']['mobile'] ?? '').toString() : (p['mobile'] ?? '').toString();
+              final emergMob = p['emergencyContact'] is Map ? (p['emergencyContact']['phone'] ?? '').toString() : '';
+              if ((cleanMob.isNotEmpty && (userMob.contains(cleanMob) || emergMob.contains(cleanMob))) ||
+                  (currentMobile.isNotEmpty && (userMob.contains(currentMobile) || emergMob.contains(currentMobile)))) {
+                match = p;
+                break;
+              }
+            }
+          }
+          if (match != null) patient = Map<String, dynamic>.from(match);
         }
       }
 
       if (patient != null) {
         final p = patient;
-        final fetchedName = p['name'] ?? '';
+        final fetchedName = (p['name'] ?? '').toString().trim();
         final fetchedMobile = p['userId'] is Map ? (p['userId']['mobile'] ?? currentMobile) : (p['mobile'] ?? currentMobile);
         final fetchedEmail = p['userId'] is Map ? (p['userId']['email'] ?? '') : (p['email'] ?? '');
         final photo = p['profilePhoto']?.toString() ?? '';
-        final addr = p['address'] ?? '';
-        final gender = p['gender'] ?? 'male';
-        final dob = p['dob'] ?? '';
+        final addr = (p['address'] ?? '').toString();
+        final gender = p['gender']?.toString() ?? _gender;
+        final dob = p['dob']?.toString() ?? _dob;
 
         String ecFormatted = '';
         if (p['emergencyContact'] is Map) {
@@ -169,23 +203,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
         if (mounted) {
           setState(() {
-            _name = fetchedName.isNotEmpty ? fetchedName : (cachedName ?? 'Patient');
-            _mobile = fetchedMobile.isNotEmpty ? fetchedMobile : currentMobile;
-            _email = fetchedEmail;
+            if (fetchedName.isNotEmpty && fetchedName.toLowerCase() != 'patient' && !fetchedName.startsWith('Patient (')) {
+              _name = fetchedName;
+            }
+            if (fetchedMobile.toString().isNotEmpty) {
+              _mobile = fetchedMobile.toString();
+            }
+            if (fetchedEmail.toString().isNotEmpty) {
+              _email = fetchedEmail.toString();
+            }
             if (photo.isNotEmpty) {
               _photoUrl = photo;
               _storage.write(key: 'patientPhoto', value: photo);
               if (currentMobile.isNotEmpty) {
                 _storage.write(key: 'patientPhoto_$currentMobile', value: photo);
               }
-            } else if (cachedPhoto != null && cachedPhoto.isNotEmpty) {
-              _photoUrl = cachedPhoto;
             }
-            _address = addr;
-            _gender = gender;
-            _dob = dob;
+            if (addr.isNotEmpty) _address = addr;
+            if (gender != null && gender.isNotEmpty) _gender = gender;
+            if (dob != null && dob.isNotEmpty) _dob = dob;
             if (ecFormatted.isNotEmpty) _emergencyContact = ecFormatted;
-            if (p['medicalHistory'] != null && p['medicalHistory'] is List) {
+            if (p['medicalHistory'] != null && p['medicalHistory'] is List && (p['medicalHistory'] as List).isNotEmpty) {
               _medicalHistory = List<String>.from(p['medicalHistory']);
             }
             _isLoading = false;
@@ -222,11 +260,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
           await _storage.write(key: 'patientPhoto_$_mobile', value: base64Image);
         }
         try {
-          await _apiService.post('/patients', data: {
+          final res = await _apiService.post('/patients', data: {
             'mobile': _mobile,
             'name': _name,
             'profilePhoto': base64Image,
           });
+          if (res.statusCode == 200 && res.data != null && res.data['patient'] != null) {
+            final cloudUrl = res.data['patient']['profilePhoto']?.toString();
+            if (cloudUrl != null && cloudUrl.startsWith('http')) {
+              if (mounted) setState(() => _photoUrl = cloudUrl);
+              await _storage.write(key: 'patientPhoto', value: cloudUrl);
+              if (_mobile.isNotEmpty) {
+                await _storage.write(key: 'patientPhoto_$_mobile', value: cloudUrl);
+              }
+            }
+          }
         } catch (_) {}
 
         if (mounted) {
@@ -776,7 +824,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                     const SizedBox(width: 10),
                                     ElevatedButton.icon(
-                                      onPressed: () => context.push('/edit_profile').then((_) => _loadProfile()),
+                                      onPressed: () => context.push('/edit_profile', extra: {
+                                        'name': _name,
+                                        'email': _email,
+                                        'mobile': _mobile,
+                                        'address': _address,
+                                        'photoUrl': _photoUrl,
+                                        'gender': _gender,
+                                        'dob': _dob,
+                                        'medicalHistory': _medicalHistory,
+                                        'emergencyContact': _emergencyContact,
+                                      }).then((_) => _loadProfile()),
                                       icon: const Icon(Icons.edit_note_rounded, size: 16),
                                       label: const Text('Edit Info'),
                                       style: ElevatedButton.styleFrom(

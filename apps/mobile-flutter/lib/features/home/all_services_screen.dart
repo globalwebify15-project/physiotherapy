@@ -504,7 +504,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (modalContext) {
         return Container(
           height: MediaQuery.of(context).size.height * 0.88,
           decoration: const BoxDecoration(
@@ -708,7 +708,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
                       child: ElevatedButton.icon(
                         onPressed: () {
                           final docId = doctor['_id'] ?? (doctor['name']?.toString().toLowerCase().contains('priyanka') == true ? 'dr_priyanka' : 'dr_rajnish');
-                          Navigator.pop(context);
+                          Navigator.pop(modalContext);
                           context.push(
                             '/booking',
                             extra: {
@@ -742,7 +742,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (modalContext) {
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: const BoxDecoration(
@@ -849,7 +849,7 @@ class _AllServicesScreenState extends State<AllServicesScreen> with SingleTicker
                       );
                       if (match.isNotEmpty) servId = match['_id']?.toString();
                     }
-                    Navigator.pop(context);
+                    Navigator.pop(modalContext);
                     context.push(
                       '/booking',
                       extra: {

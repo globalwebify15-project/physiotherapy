@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Patient, User } from 'database';
 import { getAuthenticatedUser } from '@/utils/auth';
+import { optimizeAndUploadToCloudinary } from '@/utils/cloudinary';
 
 // GET /api/patients - Fetch patient list (Admin/Staff) or specific patient profile
 export async function GET(request: NextRequest) {
@@ -69,7 +70,29 @@ export async function POST(request: NextRequest) {
     await connectDB();
     const user = await getAuthenticatedUser(request);
     const body = await request.json();
-    const { name, gender, dob, emergencyContact, savedAddresses, medicalHistory, mobile, address, profilePhoto, email } = body;
+    const { name, gender, dob, emergencyContact, savedAddresses, medicalHistory, mobile, address, profilePhoto: incomingPhoto, email } = body;
+    let profilePhoto = incomingPhoto;
+
+    // Automatically optimize & convert to WebP on Cloudinary if base64 or raw image is provided
+    if (profilePhoto && typeof profilePhoto === 'string' && profilePhoto.trim().length > 0) {
+      if (profilePhoto.startsWith('data:image') || (!profilePhoto.startsWith('http://') && !profilePhoto.startsWith('https://'))) {
+        try {
+          const cloudRes = await optimizeAndUploadToCloudinary(profilePhoto, {
+            folder: 'quickphysio24/patients',
+            maxWidth: 600,
+            maxHeight: 600,
+            quality: 80,
+            fit: 'cover',
+            position: 'center',
+          });
+          if (cloudRes?.url) {
+            profilePhoto = cloudRes.url;
+          }
+        } catch (uploadErr) {
+          console.error('[Patient Cloudinary Auto-Upload Error]:', uploadErr);
+        }
+      }
+    }
 
     let targetUserId = user?.userId;
     let foundUser: any = null;

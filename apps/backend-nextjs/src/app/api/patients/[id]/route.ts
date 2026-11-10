@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB, Patient } from 'database';
 import { getAuthenticatedUser } from '@/utils/auth';
+import { optimizeAndUploadToCloudinary } from '@/utils/cloudinary';
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -64,7 +65,29 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     if (body.emergencyContact) patient.emergencyContact = body.emergencyContact;
     if (body.savedAddresses) patient.savedAddresses = body.savedAddresses;
     if (body.medicalHistory) patient.medicalHistory = body.medicalHistory;
-    if (body.profilePhoto !== undefined) patient.profilePhoto = body.profilePhoto;
+    if (body.profilePhoto !== undefined) {
+      let finalPhoto = body.profilePhoto;
+      if (finalPhoto && typeof finalPhoto === 'string' && finalPhoto.trim().length > 0) {
+        if (finalPhoto.startsWith('data:image') || (!finalPhoto.startsWith('http://') && !finalPhoto.startsWith('https://'))) {
+          try {
+            const cloudRes = await optimizeAndUploadToCloudinary(finalPhoto, {
+              folder: 'quickphysio24/patients',
+              maxWidth: 600,
+              maxHeight: 600,
+              quality: 80,
+              fit: 'cover',
+              position: 'center',
+            });
+            if (cloudRes?.url) {
+              finalPhoto = cloudRes.url;
+            }
+          } catch (uploadErr) {
+            console.error('[Patient Cloudinary Auto-Upload Error]:', uploadErr);
+          }
+        }
+      }
+      patient.profilePhoto = finalPhoto;
+    }
 
     await patient.save();
 

@@ -141,6 +141,7 @@ async function seedRealClinicData() {
       name: 'Dr. Rajnish Bariyar',
       email: 'rajnish@drbariyarphysio.com',
       mobile: '+919110912544',
+      profilePhoto: 'https://res.cloudinary.com/bc4kgc77/image/upload/v1794290668/quickphysio24/doctors/dr_rajnish_bariyar.webp',
       qualification: 'BPT, MIAP, JSCPT • Founder & Senior Neuro/Spine Physio',
       experience: 12,
       specialization: [
@@ -161,6 +162,7 @@ async function seedRealClinicData() {
       name: 'Dr. Priyanka Bariyar',
       email: 'priyanka@drbariyarphysio.com',
       mobile: '+919693233447',
+      profilePhoto: 'https://res.cloudinary.com/bc4kgc77/image/upload/v1794290670/quickphysio24/doctors/dr_priyanka_bariyar.webp',
       qualification: 'BPT, MIAP, JSCPT • Co-Founder & Pediatric/Women\'s Health Specialist',
       experience: 10,
       specialization: [

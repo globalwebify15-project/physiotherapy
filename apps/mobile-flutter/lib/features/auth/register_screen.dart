@@ -8,7 +8,8 @@ import '../../services/api_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   final bool isEditing;
-  const RegisterScreen({super.key, this.isEditing = false});
+  final Map<String, dynamic>? initialData;
+  const RegisterScreen({super.key, this.isEditing = false, this.initialData});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -54,7 +55,57 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+    _applyInitialData();
     _loadProfileData();
+  }
+
+  void _applyInitialData() {
+    if (widget.initialData != null) {
+      final init = widget.initialData!;
+      if (init['name'] != null && init['name'].toString().trim().isNotEmpty) {
+        _nameController.text = init['name'].toString().trim();
+      }
+      if (init['email'] != null && init['email'].toString().trim().isNotEmpty) {
+        _emailController.text = init['email'].toString().trim();
+      }
+      if (init['mobile'] != null && init['mobile'].toString().trim().isNotEmpty) {
+        String clean = init['mobile'].toString().replaceAll(RegExp(r'^\+91|\D'), '').trim();
+        if (clean.length > 10) clean = clean.substring(clean.length - 10);
+        if (clean.isNotEmpty) _mobileController.text = clean;
+      }
+      if (init['address'] != null && init['address'].toString().trim().isNotEmpty) {
+        final addr = init['address'].toString().trim();
+        _addressController.text = addr;
+        _addressControllers.clear();
+        _addressControllers.add(TextEditingController(text: addr));
+      }
+      if (init['photoUrl'] != null && init['photoUrl'].toString().trim().isNotEmpty) {
+        _photoController.text = init['photoUrl'].toString().trim();
+      }
+      if (init['gender'] != null && init['gender'].toString().trim().isNotEmpty) {
+        _gender = init['gender'].toString().toLowerCase();
+      }
+      if (init['dob'] != null && init['dob'].toString().trim().isNotEmpty) {
+        try {
+          _dob = DateTime.parse(init['dob'].toString().trim());
+        } catch (_) {}
+      }
+      if (init['medicalHistory'] is List) {
+        _selectedMedicalHistory.clear();
+        _selectedMedicalHistory.addAll((init['medicalHistory'] as List).map((e) => e.toString()));
+      }
+      if (init['emergencyContact'] != null) {
+        final ec = init['emergencyContact'].toString();
+        if (ec.contains('(')) {
+          final parts = ec.split('(');
+          _emergNameController.text = parts[0].trim();
+          final phone = parts[1].replaceAll(')', '').replaceAll(RegExp(r'^\+91|\D'), '').trim();
+          _emergPhoneController.text = phone.length > 10 ? phone.substring(phone.length - 10) : phone;
+        } else {
+          _emergNameController.text = ec.trim();
+        }
+      }
+    }
   }
 
   @override
@@ -153,7 +204,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // Instantly pre-fill all fields from local storage so edit screen NEVER appears empty
       final cachedName = (await _storage.read(key: 'patientName_$storedMobile')) ??
           (await _storage.read(key: 'patientName_+91$storedMobile')) ??
-          (await _storage.read(key: 'patientName')) ?? '';
+          (await _storage.read(key: 'patientName')) ??
+          (await _storage.read(key: 'userName')) ?? '';
       final cachedEmail = (await _storage.read(key: 'patientEmail_$storedMobile')) ??
           (await _storage.read(key: 'patientEmail_+91$storedMobile')) ??
           (await _storage.read(key: 'patientEmail')) ?? '';
@@ -163,7 +215,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       final cachedPhoto = (await _storage.read(key: 'patientPhoto_$storedMobile')) ??
           (await _storage.read(key: 'patientPhoto')) ?? '';
       final cachedGender = (await _storage.read(key: 'patientGender_$storedMobile')) ??
-          (await _storage.read(key: 'patientGender')) ?? 'male';
+          (await _storage.read(key: 'patientGender')) ?? '';
       final cachedDobStr = (await _storage.read(key: 'patientDob_$storedMobile')) ??
           (await _storage.read(key: 'patientDob')) ?? '';
       final cachedEmergName = (await _storage.read(key: 'emergName_$storedMobile')) ??
@@ -177,30 +229,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (mounted) {
         setState(() {
-          if (storedMobile.isNotEmpty) _mobileController.text = storedMobile;
-          if (cachedName.isNotEmpty) _nameController.text = cachedName;
-          if (cachedEmail.isNotEmpty) _emailController.text = cachedEmail;
-          if (cachedPhoto.isNotEmpty) _photoController.text = cachedPhoto;
-          if (cachedGender.isNotEmpty) _gender = cachedGender;
+          if (storedMobile.isNotEmpty && _mobileController.text.isEmpty) _mobileController.text = storedMobile;
+          if (cachedName.isNotEmpty && _nameController.text.isEmpty && cachedName.toLowerCase() != 'patient') _nameController.text = cachedName;
+          if (cachedEmail.isNotEmpty && _emailController.text.isEmpty) _emailController.text = cachedEmail;
+          if (cachedPhoto.isNotEmpty && _photoController.text.isEmpty) _photoController.text = cachedPhoto;
+          if (cachedGender.isNotEmpty && (_gender == null || _gender.isEmpty)) _gender = cachedGender;
           if (cachedDobStr.isNotEmpty) {
             try {
               _dob = DateTime.parse(cachedDobStr);
             } catch (_) {}
           }
-          if (cachedEmergName.isNotEmpty) _emergNameController.text = cachedEmergName;
-          if (cachedEmergPhone.isNotEmpty) {
+          if (cachedEmergName.isNotEmpty && _emergNameController.text.isEmpty) _emergNameController.text = cachedEmergName;
+          if (cachedEmergPhone.isNotEmpty && _emergPhoneController.text.isEmpty) {
             String cleanEmerg = cachedEmergPhone.replaceAll(RegExp(r'^\+91|\D'), '').trim();
             if (cleanEmerg.length > 10) cleanEmerg = cleanEmerg.substring(cleanEmerg.length - 10);
             _emergPhoneController.text = cleanEmerg;
           }
-          if (cachedEmergRel.isNotEmpty) _emergRelationController.text = cachedEmergRel;
-          if (cachedAddr.isNotEmpty) {
+          if (cachedEmergRel.isNotEmpty && _emergRelationController.text.isEmpty) _emergRelationController.text = cachedEmergRel;
+          if (cachedAddr.isNotEmpty && _addressController.text.isEmpty) {
             _addressController.text = cachedAddr;
-            _addressControllers.clear();
-            _addressControllers.add(TextEditingController(text: cachedAddr));
+            if (_addressControllers.isEmpty) {
+              _addressControllers.add(TextEditingController(text: cachedAddr));
+            }
           }
-          if (cachedMedHist.isNotEmpty) {
-            _selectedMedicalHistory.clear();
+          if (cachedMedHist.isNotEmpty && _selectedMedicalHistory.isEmpty) {
             _selectedMedicalHistory.addAll(cachedMedHist.split('|||').where((s) => s.trim().isNotEmpty));
           }
         });
@@ -261,46 +313,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         if (mounted) {
           setState(() {
-            if (patient!['name'] != null && patient['name'].toString().isNotEmpty) {
-              _nameController.text = patient['name'].toString();
+            if (patient!['name'] != null && patient['name'].toString().isNotEmpty && _nameController.text.isEmpty) {
+              final pName = patient['name'].toString().trim();
+              if (pName.isNotEmpty && !pName.startsWith('Patient (') && pName.toLowerCase() != 'patient') {
+                _nameController.text = pName;
+              }
             }
             final rawUserMobile = patient['userId'] is Map ? (patient['userId']['mobile'] ?? '') : (patient['mobile'] ?? storedMobile);
             String cleanUserMob = rawUserMobile.toString().replaceAll(RegExp(r'^\+91|\D'), '').trim();
             if (cleanUserMob.length > 10) cleanUserMob = cleanUserMob.substring(cleanUserMob.length - 10);
-            if (cleanUserMob.isNotEmpty) _mobileController.text = cleanUserMob;
+            if (cleanUserMob.isNotEmpty && _mobileController.text.isEmpty) _mobileController.text = cleanUserMob;
 
             final apiEmail = patient['userId'] is Map ? (patient['userId']['email'] ?? '') : (patient['email'] ?? '');
-            if (apiEmail.toString().isNotEmpty) {
-              _emailController.text = apiEmail.toString();
+            if (apiEmail.toString().trim().isNotEmpty && _emailController.text.isEmpty) {
+              _emailController.text = apiEmail.toString().trim();
             }
-            if (patient['gender'] != null) _gender = patient['gender'];
-            if (patient['dob'] != null) {
+            if (patient['gender'] != null && (_gender == null || _gender.isEmpty)) _gender = patient['gender'];
+            if (patient['dob'] != null && _dob == DateTime(2000, 1, 1)) {
               try {
                 _dob = DateTime.parse(patient['dob']);
               } catch (_) {}
             }
-            if (patient['profilePhoto'] != null && patient['profilePhoto'].toString().isNotEmpty) {
+            if (patient['profilePhoto'] != null && patient['profilePhoto'].toString().isNotEmpty && _photoController.text.isEmpty) {
               _photoController.text = patient['profilePhoto'];
             }
             
-            if (patient['medicalHistory'] != null && patient['medicalHistory'] is List) {
-              _selectedMedicalHistory.clear();
+            if (patient['medicalHistory'] != null && patient['medicalHistory'] is List && _selectedMedicalHistory.isEmpty) {
               _selectedMedicalHistory.addAll(List<String>.from(patient['medicalHistory']));
             }
 
             if (patient['emergencyContact'] != null && patient['emergencyContact'] is Map) {
-              _emergNameController.text = patient['emergencyContact']['name'] ?? '';
+              if (_emergNameController.text.isEmpty) _emergNameController.text = patient['emergencyContact']['name'] ?? '';
               final rawEmerg = (patient['emergencyContact']['phone'] ?? '').toString();
               String cleanEmerg = rawEmerg.replaceAll(RegExp(r'^\+91|\D'), '').trim();
               if (cleanEmerg.length > 10) cleanEmerg = cleanEmerg.substring(cleanEmerg.length - 10);
-              _emergPhoneController.text = cleanEmerg;
-              _emergRelationController.text = patient['emergencyContact']['relation'] ?? '';
+              if (_emergPhoneController.text.isEmpty) _emergPhoneController.text = cleanEmerg;
+              if (_emergRelationController.text.isEmpty) _emergRelationController.text = patient['emergencyContact']['relation'] ?? '';
             }
 
-            if (patient['savedAddresses'] != null && patient['savedAddresses'] is List) {
+            if (patient['savedAddresses'] != null && patient['savedAddresses'] is List && _addressControllers.isEmpty) {
               final list = patient['savedAddresses'] as List;
               if (list.isNotEmpty) {
-                _addressControllers.clear();
                 for (var addr in list) {
                   final line = addr is Map ? (addr['addressLine']?.toString() ?? '') : addr.toString();
                   if (line.isNotEmpty) {
@@ -439,6 +492,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
           final patient = response.data['patient'];
           if (patient != null && patient['_id'] != null) {
             await _storage.write(key: 'patientId', value: patient['_id']);
+            final cloudPhoto = patient['profilePhoto']?.toString();
+            if (cloudPhoto != null && cloudPhoto.startsWith('http')) {
+              _photoController.text = cloudPhoto;
+              await _storage.write(key: 'patientPhoto', value: cloudPhoto);
+              if (cleanDigits.isNotEmpty) {
+                await _storage.write(key: 'patientPhoto_$cleanDigits', value: cloudPhoto);
+              }
+            }
           }
         }
       } catch (apiErr) {

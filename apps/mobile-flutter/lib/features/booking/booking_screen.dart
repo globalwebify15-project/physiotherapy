@@ -185,7 +185,7 @@ class _BookingScreenState extends State<BookingScreen> {
       // 2a. Direct exact or substring match
       for (final s in _services) {
         if (s is Map) {
-          final sTitle = (s['title'] ?? '').toString().toLowerCase();
+          final sTitle = (s['title'] ?? s['name'] ?? '').toString().toLowerCase();
           final sClean = sTitle.replaceAll(RegExp(r'[^a-z0-9]'), ' ').trim();
           if (sClean == cleanTarget || sTitle.contains(targetTitle.toLowerCase()) || targetTitle.toLowerCase().contains(sTitle)) {
             return s['_id']?.toString();
@@ -296,11 +296,14 @@ class _BookingScreenState extends State<BookingScreen> {
 
   num _getBasePrice() {
     if (_selectedServiceId == null) return 0;
-    final selectedService = _services.firstWhere(
-      (s) => s is Map && s['_id']?.toString() == _selectedServiceId?.toString(),
-      orElse: () => null,
-    );
-    if (selectedService == null || selectedService is! Map) return 0;
+    Map? selectedService;
+    for (final s in _services) {
+      if (s is Map && s['_id']?.toString() == _selectedServiceId?.toString()) {
+        selectedService = s;
+        break;
+      }
+    }
+    if (selectedService == null) return 0;
 
     final rawHome = selectedService['pricingHome'] ?? selectedService['homePrice'];
     final rawClinic = selectedService['pricingClinic'] ?? selectedService['clinicPrice'];
@@ -342,14 +345,16 @@ class _BookingScreenState extends State<BookingScreen> {
     return total;
   }
 
-  void _applyPromoCode() {
+  void _applyPromoCode({bool showFeedback = true}) {
     final code = _promoController.text.trim().toUpperCase();
     if (code.isEmpty) return;
 
     if (_selectedServiceId == null) {
-      setState(() {
-        _promoError = 'Please select a treatment service first before applying promo code.';
-      });
+      if (mounted) {
+        setState(() {
+          _promoError = 'Please select a treatment service first before applying promo code.';
+        });
+      }
       return;
     }
 
@@ -359,48 +364,56 @@ class _BookingScreenState extends State<BookingScreen> {
     );
 
     if (match.isEmpty) {
-      setState(() {
-        _appliedCoupon = null;
-        _promoError = 'Invalid promo code "$code". Please check and try again.';
-      });
+      if (mounted) {
+        setState(() {
+          _appliedCoupon = null;
+          _promoError = 'Invalid promo code "$code". Please check and try again.';
+        });
+      }
       return;
     }
 
     final minAmount = num.tryParse(match['minAmount']?.toString() ?? '0') ?? 0;
     final basePrice = _getBasePrice();
     if (minAmount > 0 && basePrice < minAmount) {
-      setState(() {
-        _appliedCoupon = null;
-        _promoError = 'Coupon requires minimum booking amount of ₹$minAmount (Selected: ₹$basePrice).';
-      });
+      if (mounted) {
+        setState(() {
+          _appliedCoupon = null;
+          _promoError = 'Coupon requires minimum booking amount of ₹$minAmount (Selected: ₹$basePrice).';
+        });
+      }
       return;
     }
 
-    setState(() {
-      _appliedCoupon = match;
-      _promoError = null;
-    });
+    if (mounted) {
+      setState(() {
+        _appliedCoupon = match;
+        _promoError = null;
+      });
+    }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                'Coupon "$code" applied! Saved ₹${_getDiscountAmount().toStringAsFixed(0)}.',
-                style: const TextStyle(fontWeight: FontWeight.w600),
+    if (showFeedback && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Coupon "$code" applied! Saved ₹${_getDiscountAmount().toStringAsFixed(0)}.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
+          backgroundColor: const Color(0xFF0F766E),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          duration: const Duration(seconds: 2),
         ),
-        backgroundColor: const Color(0xFF0F766E),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        duration: const Duration(seconds: 2),
-      ),
-    );
+      );
+    }
   }
 
   void _removePromoCode() {
@@ -443,16 +456,22 @@ class _BookingScreenState extends State<BookingScreen> {
             final exists = _therapists.any((t) => t['_id']?.toString() == _selectedTherapistId);
             if (!exists) {
               if (_selectedTherapistId == 'dr_rajnish') {
-                final match = _therapists.firstWhere(
-                  (t) => (t['name'] ?? '').toString().toLowerCase().contains('rajnish'),
-                  orElse: () => null,
-                );
+                Map? match;
+                for (final t in _therapists) {
+                  if (t is Map && (t['name'] ?? '').toString().toLowerCase().contains('rajnish')) {
+                    match = t;
+                    break;
+                  }
+                }
                 if (match != null) _selectedTherapistId = match['_id']?.toString();
               } else if (_selectedTherapistId == 'dr_priyanka') {
-                final match = _therapists.firstWhere(
-                  (t) => (t['name'] ?? '').toString().toLowerCase().contains('priyanka'),
-                  orElse: () => null,
-                );
+                Map? match;
+                for (final t in _therapists) {
+                  if (t is Map && (t['name'] ?? '').toString().toLowerCase().contains('priyanka')) {
+                    match = t;
+                    break;
+                  }
+                }
                 if (match != null) _selectedTherapistId = match['_id']?.toString();
               }
             }
@@ -465,7 +484,12 @@ class _BookingScreenState extends State<BookingScreen> {
         if (matchedId != null) {
           _selectedServiceId = matchedId;
           if (_promoController.text.trim().isNotEmpty && _appliedCoupon == null) {
-            _applyPromoCode();
+            _applyPromoCode(showFeedback: false);
+          }
+        } else if (_selectedServiceId != null) {
+          final exists = _services.any((s) => s is Map && s['_id']?.toString() == _selectedServiceId);
+          if (!exists) {
+            _selectedServiceId = null;
           }
         }
         // Deliberately keep _selectedServiceId as null if no initial selection was passed,
@@ -497,7 +521,12 @@ class _BookingScreenState extends State<BookingScreen> {
         if (matchedId != null) {
           _selectedServiceId = matchedId;
           if (_promoController.text.trim().isNotEmpty && _appliedCoupon == null) {
-            _applyPromoCode();
+            _applyPromoCode(showFeedback: false);
+          }
+        } else if (_selectedServiceId != null) {
+          final exists = _services.any((s) => s is Map && s['_id']?.toString() == _selectedServiceId);
+          if (!exists) {
+            _selectedServiceId = null;
           }
         }
         _isLoading = false;
@@ -676,10 +705,13 @@ class _BookingScreenState extends State<BookingScreen> {
     setState(() => _isBookingSubmitting = true);
 
     final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
-    final selectedService = _services.firstWhere(
-      (s) => s is Map && s['_id']?.toString() == _selectedServiceId?.toString(),
-      orElse: () => {'title': 'Physiotherapy Consultation'},
-    );
+    Map selectedService = {'title': 'Physiotherapy Consultation'};
+    for (final s in _services) {
+      if (s is Map && s['_id']?.toString() == _selectedServiceId?.toString()) {
+        selectedService = s;
+        break;
+      }
+    }
 
     final userMobile = await _storage.read(key: 'userMobile') ?? '';
     final userName = await _storage.read(key: 'patientName') ?? 'Patient';
@@ -814,6 +846,472 @@ class _BookingScreenState extends State<BookingScreen> {
     }
   }
 
+  Widget _buildServiceSelector(BuildContext context) {
+    Map<String, dynamic>? selectedService;
+    if (_selectedServiceId != null) {
+      for (final s in _services) {
+        if (s is Map && s['_id']?.toString() == _selectedServiceId?.toString()) {
+          selectedService = Map<String, dynamic>.from(s);
+          break;
+        }
+      }
+    }
+
+    final num basePrice = _getBasePrice();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Select Treatment Service *',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            if (selectedService != null)
+              GestureDetector(
+                onTap: () => _showServiceSelectionModal(context),
+                child: const Text(
+                  'Change',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        InkWell(
+          onTap: () => _showServiceSelectionModal(context),
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: selectedService != null ? const Color(0xFFF0FDFA) : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _showServiceValidationError
+                    ? const Color(0xFFEF4444)
+                    : (selectedService != null ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0)),
+                width: (_showServiceValidationError || selectedService != null) ? 1.6 : 1.0,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                )
+              ],
+            ),
+            child: selectedService == null
+                ? Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE0F2FE),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.medical_services_outlined, color: Color(0xFF0284C7), size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Choose Treatment Service / सेवा चुनें *',
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Tap to select from 34+ specialized therapies',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF0F766E), size: 26),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF0F766E),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.healing_rounded, color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              (selectedService['title'] ?? 'Selected Service').toString(),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFCCFBF1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '₹$basePrice ${_selectedVisitType == 'home' ? 'Doorstep Home' : 'Clinic Consultation'}',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF0F766E),
+                                    ),
+                                  ),
+                                ),
+                                if (selectedService['category'] != null)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF1F5F9),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      selectedService['category'].toString(),
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF475569),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2E8F0).withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.edit_outlined, size: 16, color: Color(0xFF0F766E)),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+        if (_showServiceValidationError)
+          const Padding(
+            padding: EdgeInsets.only(top: 6, left: 4),
+            child: Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 14),
+                SizedBox(width: 4),
+                Text(
+                  'Please choose a service to continue booking',
+                  style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showServiceSelectionModal(BuildContext context) {
+    String searchQuery = '';
+    String selectedCategory = 'All';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            // Build categories list
+            final Set<String> categories = {'All'};
+            for (final s in _services) {
+              if (s is Map && s['category'] != null && s['category'].toString().trim().isNotEmpty) {
+                categories.add(s['category'].toString().trim());
+              }
+            }
+
+            // Filter services by search and category
+            final filteredServices = _services.where((s) {
+              if (s is! Map) return false;
+              final title = (s['title'] ?? '').toString().toLowerCase();
+              final desc = (s['description'] ?? '').toString().toLowerCase();
+              final cat = (s['category'] ?? '').toString().toLowerCase();
+              final q = searchQuery.toLowerCase().trim();
+
+              final matchesSearch = q.isEmpty || title.contains(q) || desc.contains(q) || cat.contains(q);
+              final matchesCategory = selectedCategory == 'All' || cat == selectedCategory.toLowerCase();
+
+              return matchesSearch && matchesCategory;
+            }).toList();
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.85,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  // Drag Handle
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Header
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Select Treatment Service',
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${_services.length} specialized therapies available',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close_rounded, color: Color(0xFF64748B)),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Search Box
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: TextField(
+                      autofocus: false,
+                      onChanged: (val) {
+                        setSheetState(() => searchQuery = val);
+                      },
+                      decoration: InputDecoration(
+                        hintText: 'Search condition (e.g. Knee, Stroke, Back)...',
+                        hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                        prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF0F766E), size: 20),
+                        suffixIcon: searchQuery.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                                onPressed: () {
+                                  setSheetState(() => searchQuery = '');
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          borderSide: const BorderSide(color: Color(0xFF0F766E), width: 1.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Category Pills
+                  SizedBox(
+                    height: 34,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: categories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (context, idx) {
+                        final cat = categories.elementAt(idx);
+                        final isSel = selectedCategory == cat;
+                        return ChoiceChip(
+                          label: Text(cat),
+                          selected: isSel,
+                          onSelected: (_) {
+                            setSheetState(() => selectedCategory = cat);
+                          },
+                          labelStyle: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: isSel ? Colors.white : const Color(0xFF475569),
+                          ),
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          selectedColor: const Color(0xFF0F766E),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: Color(0xFFE2E8F0)),
+
+                  // Services List
+                  Expanded(
+                    child: filteredServices.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.search_off_rounded, size: 48, color: Color(0xFF94A3B8)),
+                                const SizedBox(height: 10),
+                                Text(
+                                  'No treatments matching "$searchQuery"',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'Try searching for back pain, stroke, or paralysis',
+                                  style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            itemCount: filteredServices.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
+                              final s = filteredServices[index];
+                              final sId = s['_id']?.toString() ?? '';
+                              final title = (s['title'] ?? 'Therapy Service').toString();
+                              final rawHome = s['pricingHome'] ?? s['homePrice'];
+                              final rawClinic = s['pricingClinic'] ?? s['clinicPrice'];
+                              final num hPrice = (rawHome is num) ? rawHome : (num.tryParse(rawHome?.toString() ?? '') ?? 950);
+                              final num cPrice = (rawClinic is num) ? rawClinic : (num.tryParse(rawClinic?.toString() ?? '') ?? 650);
+                              final isSelected = _selectedServiceId == sId;
+
+                              return InkWell(
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  setState(() {
+                                    _selectedServiceId = sId;
+                                    _showServiceValidationError = false;
+                                    if (_appliedCoupon != null) {
+                                      final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
+                                      final basePrice = _getBasePrice();
+                                      if (minAmount > 0 && basePrice < minAmount) {
+                                        _appliedCoupon = null;
+                                        _promoError = 'Coupon removed: requires min booking of ₹$minAmount.';
+                                      }
+                                    }
+                                  });
+                                },
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.all(14),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? const Color(0xFFF0FDFA) : Colors.white,
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFE2E8F0),
+                                      width: isSelected ? 1.8 : 1.0,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 36,
+                                        height: 36,
+                                        decoration: BoxDecoration(
+                                          color: isSelected ? const Color(0xFF0F766E) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          Icons.medical_services_rounded,
+                                          color: isSelected ? Colors.white : const Color(0xFF0F766E),
+                                          size: 18,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              title,
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                                color: isSelected ? const Color(0xFF0F766E) : const Color(0xFF0F172A),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 3),
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  'Clinic: ₹$cPrice',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                                                ),
+                                                const Text('  •  ', style: TextStyle(fontSize: 11, color: Color(0xFFCBD5E1))),
+                                                Text(
+                                                  'Home: ₹$hPrice',
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF64748B)),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (isSelected)
+                                        const Icon(Icons.check_circle_rounded, color: Color(0xFF0F766E), size: 22)
+                                      else
+                                        const Icon(Icons.chevron_right_rounded, color: Color(0xFFCBD5E1), size: 20),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Generate dates for the next 10 days
@@ -842,135 +1340,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Service Selector
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Select Treatment Service *',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                            ),
-                            if (_selectedServiceId != null)
-                              TextButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _selectedServiceId = null;
-                                    _appliedCoupon = null;
-                                  });
-                                },
-                                style: TextButton.styleFrom(
-                                  padding: EdgeInsets.zero,
-                                  minimumSize: Size.zero,
-                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                ),
-                                child: const Text('Change', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: _showServiceValidationError ? const Color(0xFFEF4444) : const Color(0xFFE2E8F0),
-                              width: _showServiceValidationError ? 1.8 : 1.0,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.015),
-                                blurRadius: 6,
-                                offset: const Offset(0, 2),
-                              )
-                            ],
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: Builder(
-                              builder: (context) {
-                                final seenServiceIds = <String>{};
-                                final dropdownItems = <DropdownMenuItem<String>>[];
-                                for (final service in _services) {
-                                  if (service is Map) {
-                                    final sId = service['_id']?.toString();
-                                    if (sId != null && sId.isNotEmpty && !seenServiceIds.contains(sId)) {
-                                      seenServiceIds.add(sId);
-                                      final rawHome = service['homePrice'] ?? service['pricingHome'];
-                                      final rawClinic = service['clinicPrice'] ?? service['pricingClinic'];
-                                      final num sPrice = _selectedVisitType == 'home'
-                                          ? ((rawHome is num) ? rawHome : (num.tryParse(rawHome?.toString() ?? '') ?? 950))
-                                          : ((rawClinic is num) ? rawClinic : (num.tryParse(rawClinic?.toString() ?? '') ?? 650));
-                                      dropdownItems.add(
-                                        DropdownMenuItem<String>(
-                                          value: sId,
-                                          child: Row(
-                                            children: [
-                                              Expanded(
-                                                child: Text(
-                                                  service['title']?.toString() ?? 'Service',
-                                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(
-                                                '₹$sPrice',
-                                                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Color(0xFF0F766E)),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  }
-                                }
-
-                                final currentVal = (_selectedServiceId != null && seenServiceIds.contains(_selectedServiceId))
-                                    ? _selectedServiceId
-                                    : null;
-
-                                return DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: currentVal,
-                                  hint: const Text(
-                                    'Choose Treatment Service / सेवा चुनें *',
-                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: Color(0xFF94A3B8)),
-                                  ),
-                                  icon: const Icon(Icons.arrow_drop_down_rounded, color: Color(0xFF0F766E)),
-                                  items: dropdownItems,
-                                  onChanged: (val) {
-                                    if (val == null) return;
-                                    setState(() {
-                                      _selectedServiceId = val;
-                                      _showServiceValidationError = false;
-                                      if (_appliedCoupon != null) {
-                                        final minAmount = num.tryParse(_appliedCoupon!['minAmount']?.toString() ?? '0') ?? 0;
-                                        final basePrice = _getBasePrice();
-                                        if (minAmount > 0 && basePrice < minAmount) {
-                                          _appliedCoupon = null;
-                                          _promoError = 'Coupon removed: requires min booking of ₹$minAmount.';
-                                        }
-                                      }
-                                    });
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                        if (_showServiceValidationError)
-                          const Padding(
-                            padding: EdgeInsets.only(top: 6, left: 4),
-                            child: Row(
-                              children: [
-                                Icon(Icons.error_outline_rounded, color: Color(0xFFEF4444), size: 14),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Please choose a service to continue booking',
-                                  style: TextStyle(color: Color(0xFFEF4444), fontSize: 11, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
+                        _buildServiceSelector(context),
                         const SizedBox(height: 20),
 
                         // Doctor Selector

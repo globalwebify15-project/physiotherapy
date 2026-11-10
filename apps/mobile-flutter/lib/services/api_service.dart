@@ -14,23 +14,6 @@ class ApiService {
   // with automatic fast fallback to local cache if device is offline.
   static const bool _useMockMode = false;
 
-  // Seed default appointment for demonstration
-  static final Map<String, dynamic> _defaultSeedAppt = {
-    '_id': 'app_seed_01',
-    'status': 'confirmed',
-    'date': '2026-09-30',
-    'timeSlot': '10:00 AM',
-    'visitType': 'clinic',
-    'therapistId': {
-      '_id': 'dr_rajnish',
-      'name': 'Dr. Rajnish Bariyar'
-    },
-    'serviceId': {
-      '_id': '1',
-      'title': 'Stroke / Paralysis'
-    }
-  };
-
   static final List<Map<String, dynamic>> _mockServices = [
     {
       '_id': '1',
@@ -476,19 +459,32 @@ class ApiService {
         );
       } else if (path.startsWith('/patients')) {
         final cachedName = await _storage.read(key: 'patientName_$currentMobile') ??
+            await _storage.read(key: 'patientName_$cleanMobile') ??
+            await _storage.read(key: 'patientName') ??
+            await _storage.read(key: 'userName') ??
             (currentMobile == '9334306358' ? 'Amarjeet Pandey' : '');
             
         final cachedEmail = await _storage.read(key: 'patientEmail_$currentMobile') ??
+            await _storage.read(key: 'patientEmail_$cleanMobile') ??
+            await _storage.read(key: 'patientEmail') ??
             (currentMobile == '9334306358' ? 'amarjeet@globalwebify.com' : '');
             
         final cachedAddress = await _storage.read(key: 'patientAddress_$currentMobile') ??
+            await _storage.read(key: 'patientAddress_$cleanMobile') ??
+            await _storage.read(key: 'patientAddress') ??
             (currentMobile == '9334306358' ? 'Ashok Nagar, Ranchi, Jharkhand' : '');
             
-        final cachedPhoto = await _storage.read(key: 'patientPhoto_$currentMobile') ?? '';
+        final cachedPhoto = await _storage.read(key: 'patientPhoto_$currentMobile') ??
+            await _storage.read(key: 'patientPhoto_$cleanMobile') ??
+            await _storage.read(key: 'patientPhoto') ?? '';
             
-        final cachedGender = await _storage.read(key: 'patientGender_$currentMobile') ?? 'male';
+        final cachedGender = await _storage.read(key: 'patientGender_$currentMobile') ??
+            await _storage.read(key: 'patientGender_$cleanMobile') ??
+            await _storage.read(key: 'patientGender') ?? 'male';
             
-        final cachedDob = await _storage.read(key: 'patientDob_$currentMobile') ?? '2000-01-01T00:00:00.000Z';
+        final cachedDob = await _storage.read(key: 'patientDob_$currentMobile') ??
+            await _storage.read(key: 'patientDob_$cleanMobile') ??
+            await _storage.read(key: 'patientDob') ?? '2000-01-01T00:00:00.000Z';
             
         final cachedEmergName = await _storage.read(key: 'emergName_$currentMobile') ??
             (currentMobile == '9334306358' ? 'Pooja Pandey' : '');
@@ -892,11 +888,12 @@ class ApiService {
       if (res.statusCode == 200 && res.data != null) {
         dynamic content = res.data['content'];
         if (content == null && res.data['cmsBlocks'] is List) {
-          final block = (res.data['cmsBlocks'] as List).firstWhere(
-            (b) => b['key'] == 'homepage_banners',
-            orElse: () => null,
-          );
-          if (block != null) content = block['content'];
+          for (final b in (res.data['cmsBlocks'] as List)) {
+            if (b is Map && b['key'] == 'homepage_banners') {
+              content = b['content'];
+              break;
+            }
+          }
         }
 
         if (content is List && content.isNotEmpty) {
@@ -921,11 +918,12 @@ class ApiService {
       if (res.statusCode == 200 && res.data != null) {
         dynamic content = res.data['content'];
         if (content == null && res.data['cmsBlocks'] is List) {
-          final block = (res.data['cmsBlocks'] as List).firstWhere(
-            (b) => b['key'] == 'faqs',
-            orElse: () => null,
-          );
-          if (block != null) content = block['content'];
+          for (final b in (res.data['cmsBlocks'] as List)) {
+            if (b is Map && b['key'] == 'faqs') {
+              content = b['content'];
+              break;
+            }
+          }
         }
 
         if (content is List && content.isNotEmpty) {
@@ -954,11 +952,12 @@ class ApiService {
       if (res.statusCode == 200 && res.data != null) {
         dynamic content = res.data['content'];
         if (content == null && res.data['cmsBlocks'] is List) {
-          final block = (res.data['cmsBlocks'] as List).firstWhere(
-            (b) => b['key'] == 'contact_details',
-            orElse: () => null,
-          );
-          if (block != null) content = block['content'];
+          for (final b in (res.data['cmsBlocks'] as List)) {
+            if (b is Map && b['key'] == 'contact_details') {
+              content = b['content'];
+              break;
+            }
+          }
         }
 
         if (content is Map) {
@@ -980,11 +979,12 @@ class ApiService {
       if (res.statusCode == 200 && res.data != null) {
         dynamic content = res.data['content'];
         if (content == null && res.data['cmsBlocks'] is List) {
-          final block = (res.data['cmsBlocks'] as List).firstWhere(
-            (b) => b['key'] == 'about_clinic',
-            orElse: () => null,
-          );
-          if (block != null) content = block['content'];
+          for (final b in (res.data['cmsBlocks'] as List)) {
+            if (b is Map && b['key'] == 'about_clinic') {
+              content = b['content'];
+              break;
+            }
+          }
         }
 
         if (content is Map) {
@@ -1006,11 +1006,12 @@ class ApiService {
       if (res.statusCode == 200 && res.data != null) {
         dynamic content = res.data['content'];
         if (content == null && res.data['cmsBlocks'] is List) {
-          final block = (res.data['cmsBlocks'] as List).firstWhere(
-            (b) => b['key'] == 'offers',
-            orElse: () => null,
-          );
-          if (block != null) content = block['content'];
+          for (final b in (res.data['cmsBlocks'] as List)) {
+            if (b is Map && b['key'] == 'offers') {
+              content = b['content'];
+              break;
+            }
+          }
         }
 
         if (content is List && content.isNotEmpty) {

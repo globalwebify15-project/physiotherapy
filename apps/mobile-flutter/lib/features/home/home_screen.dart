@@ -435,7 +435,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (modalContext) {
         return Container(
           padding: const EdgeInsets.all(24),
           decoration: const BoxDecoration(
@@ -626,7 +626,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
                       if (match.isNotEmpty) servId = match['_id']?.toString();
                     }
-                    Navigator.pop(context);
+                    Navigator.pop(modalContext);
                     context.push(
                       '/booking',
                       extra: {

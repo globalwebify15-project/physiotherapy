@@ -47,6 +47,65 @@ void main() async {
     debugPrint('[SESSION CHECK ERROR]: $e');
   }
 
+  // Crash-proof Error Widget to prevent blank/gray screens
+  FlutterError.onError = (FlutterErrorDetails details) {
+    FlutterError.presentError(details);
+    debugPrint('[FLUTTER GLOBAL ERROR]: ${details.exceptionAsString()}');
+  };
+
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return Material(
+      color: const Color(0xFFF8FAFC),
+      child: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFCCFBF1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.healing_rounded, color: Color(0xFF0F766E), size: 28),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'QuickPhysio24',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F766E)),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Temporarily refreshing view...',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF0F172A)),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final nav = rootNavigatorKey.currentState;
+                    if (nav != null && nav.canPop()) {
+                      nav.pop();
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded, size: 16),
+                  label: const Text('Back'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0F766E),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   runApp(
     ProviderScope(
       child: PhysioApp(initialLocation: initialRoute),
@@ -162,7 +221,10 @@ class PhysioApp extends ConsumerWidget {
         ),
         GoRoute(
           path: '/edit_profile',
-          builder: (context, state) => const RegisterScreen(isEditing: true),
+          builder: (context, state) => RegisterScreen(
+            isEditing: true,
+            initialData: state.extra as Map<String, dynamic>?,
+          ),
         ),
       ],
     );

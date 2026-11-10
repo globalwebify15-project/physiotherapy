@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_storage.dart';
 
@@ -179,22 +180,209 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Widget _buildSocialButton(IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          )
-        ],
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+  Future<void> _signInWithGoogle() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: '702688746378-6o2dtfb174qoe6qvfbkbj4jt1jphpv4j.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        // User cancelled picker
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      final idToken = await userCred.user?.getIdToken();
+
+      await _syncSocialUser(
+        idToken: idToken,
+        provider: 'google',
+        email: userCred.user?.email ?? googleUser.email,
+        name: userCred.user?.displayName ?? googleUser.displayName ?? '',
+        photoUrl: userCred.user?.photoURL ?? googleUser.photoUrl,
+        uid: userCred.user?.uid ?? googleUser.id,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'Google Sign-In failed (${e.code})'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Google Sign-In: ${e.toString()}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final appleProvider = OAuthProvider('apple.com');
+      appleProvider.addScope('email');
+      appleProvider.addScope('name');
+
+      final userCred = await FirebaseAuth.instance.signInWithProvider(appleProvider);
+      final idToken = await userCred.user?.getIdToken();
+
+      await _syncSocialUser(
+        idToken: idToken,
+        provider: 'apple',
+        email: userCred.user?.email,
+        name: userCred.user?.displayName ?? 'Apple User',
+        photoUrl: userCred.user?.photoURL,
+        uid: userCred.user?.uid,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'Apple Sign-In failed (${e.code})'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Apple Sign-In: ${e.toString()}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncSocialUser({
+    required String? idToken,
+    required String provider,
+    String? email,
+    String? name,
+    String? photoUrl,
+    String? uid,
+  }) async {
+    try {
+      final response = await _apiService.post('/auth/social', data: {
+        'idToken': idToken,
+        'provider': provider,
+        'email': email,
+        'name': name,
+        'photoUrl': photoUrl,
+        'uid': uid,
+      });
+
+      if (response.statusCode == 200 && mounted) {
+        final data = response.data;
+        await AppStorage.write(key: 'accessToken', value: data['accessToken']?.toString());
+        await AppStorage.write(key: 'refreshToken', value: data['refreshToken']?.toString());
+        if (data['user']?['mobile'] != null) {
+          await AppStorage.write(key: 'userMobile', value: data['user']['mobile'].toString());
+        }
+
+        final patientData = data['patient'];
+        if (patientData is Map) {
+          final pId = patientData['id']?.toString() ?? patientData['_id']?.toString();
+          if (pId != null) await AppStorage.write(key: 'patientId', value: pId);
+
+          final pName = patientData['name']?.toString() ?? name ?? '';
+          if (pName.isNotEmpty && !pName.startsWith('Patient (')) {
+            await AppStorage.write(key: 'patientName', value: pName);
+          }
+        }
+
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Signed in successfully! Welcome ${name ?? ''}'),
+            backgroundColor: const Color(0xFF0F766E),
+          ),
+        );
+        context.go('/home');
+      } else {
+        throw Exception(response.data?['error'] ?? 'Sign in failed');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign-in failed: ${e.toString()}'),
+            backgroundColor: Colors.red.shade700,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildSocialOptionButton({
+    required Widget icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _isLoading ? null : onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.04),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                )
+              ],
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                icon,
+                const SizedBox(width: 8),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
-      child: Icon(icon, color: color, size: 24),
     );
   }
 
@@ -330,11 +518,34 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 20),
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _buildSocialButton(Icons.g_mobiledata_rounded, const Color(0xFFEA4335)),
-                  _buildSocialButton(Icons.facebook_rounded, const Color(0xFF1877F2)),
-                  _buildSocialButton(Icons.apple_rounded, Colors.black),
+                  _buildSocialOptionButton(
+                    icon: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEA4335).withOpacity(0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: Color(0xFFEA4335),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                    label: 'Google',
+                    onTap: _signInWithGoogle,
+                  ),
+                  const SizedBox(width: 14),
+                  _buildSocialOptionButton(
+                    icon: const Icon(Icons.apple_rounded, color: Colors.black, size: 22),
+                    label: 'Apple',
+                    onTap: _signInWithApple,
+                  ),
                 ],
               ),
               const SizedBox(height: 36),

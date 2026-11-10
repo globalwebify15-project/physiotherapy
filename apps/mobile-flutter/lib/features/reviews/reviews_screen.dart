@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/api_service.dart';
+import '../../utils/app_storage.dart';
 
 class ReviewsScreen extends StatefulWidget {
   const ReviewsScreen({super.key});
@@ -13,7 +13,7 @@ class ReviewsScreen extends StatefulWidget {
 
 class _ReviewsScreenState extends State<ReviewsScreen> {
   final ApiService _apiService = ApiService();
-  final FlutterSecureStorage _storage = const FlutterSecureStorage();
+  final _storage = AppStorage.instance;
   bool _isLoading = true;
   List<Map<String, dynamic>> _reviews = [];
   String _selectedFilter = 'All';
@@ -89,19 +89,25 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
       if (raw != null && raw.isNotEmpty) {
         final decoded = jsonDecode(raw);
         if (decoded is List) {
-          return List<Map<String, dynamic>>.from(decoded);
+          return decoded.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[LoadLocalReviews Error]: $e');
+    }
     return [];
   }
 
   Future<void> _saveLocalReview(Map<String, dynamic> rev) async {
     try {
       final current = await _loadLocalReviews();
+      final comment = (rev['comment'] ?? '').toString().trim();
+      current.removeWhere((r) => (r['comment'] ?? '').toString().trim() == comment);
       current.insert(0, rev);
       await _storage.write(key: 'local_patient_reviews', value: jsonEncode(current));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[SaveLocalReview Error]: $e');
+    }
   }
 
   Future<void> _fetchReviews() async {
