@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/api_service.dart';
 import '../../utils/app_storage.dart';
 
@@ -558,7 +559,62 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: TextStyle(color: Color(0xFF64748B), fontSize: 12),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () {
+                      showModalBottomSheet(
+                        context: context,
+                        backgroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(
+                          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                        ),
+                        builder: (ctx) => Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Legal & Compliance Policies',
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                              ),
+                              const SizedBox(height: 6),
+                              const Text(
+                                'QuickPhysio24.com • Synergy Global Hospital, Ranchi',
+                                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                              ),
+                              const SizedBox(height: 16),
+                              ListTile(
+                                leading: const Icon(Icons.description_outlined, color: Color(0xFF0F766E)),
+                                title: const Text('Terms & Conditions', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                                onTap: () => launchUrl(
+                                  Uri.parse('https://physiotherapy-backend-nextjs.vercel.app/terms'),
+                                  mode: LaunchMode.externalApplication,
+                                ),
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.privacy_tip_outlined, color: Color(0xFF0F766E)),
+                                title: const Text('Privacy Policy', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                                onTap: () => launchUrl(
+                                  Uri.parse('https://physiotherapy-backend-nextjs.vercel.app/privacy'),
+                                  mode: LaunchMode.externalApplication,
+                                ),
+                              ),
+                              ListTile(
+                                leading: const Icon(Icons.assignment_return_outlined, color: Color(0xFF0F766E)),
+                                title: const Text('7-Day Refund & Cancellation Policy', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                                trailing: const Icon(Icons.open_in_new_rounded, size: 18),
+                                onTap: () => launchUrl(
+                                  Uri.parse('https://physiotherapy-backend-nextjs.vercel.app/refund-policy'),
+                                  mode: LaunchMode.externalApplication,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                     child: const Text(
                       'Terms & Privacy',
                       style: TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.bold, fontSize: 12),

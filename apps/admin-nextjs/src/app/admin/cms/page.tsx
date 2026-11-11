@@ -6,6 +6,7 @@ import { getAdminSession } from '@/utils/auth';
 import EditFaqModal from '@/components/EditFaqModal';
 import EditOfferModal from '@/components/EditOfferModal';
 import CmsSubmitButton from '@/components/CmsSubmitButton';
+import CompliancePagesEditor from '@/components/CompliancePagesEditor';
 import { 
   Settings, 
   Phone, 
@@ -597,6 +598,13 @@ export default async function CMSPage() {
     offerCMS = await CMS.findOne({ key: 'offers' });
   }
   const offers = Array.isArray(offerCMS?.content) ? offerCMS.content : [];
+
+  // 7. Load Mandatory Compliance Pages (policy_*)
+  const complianceDocs = await CMS.find({ key: /^policy_/ }).lean();
+  const compliancePagesMap: Record<string, any> = {};
+  for (const doc of complianceDocs) {
+    compliancePagesMap[(doc as any).key] = (doc as any).content;
+  }
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -1380,6 +1388,9 @@ export default async function CMSPage() {
           </div>
         </div>
       </div>
+
+      {/* Row 4: Mandatory Compliance & Legal Pages Editor */}
+      <CompliancePagesEditor initialPages={JSON.parse(JSON.stringify(compliancePagesMap))} />
     </div>
   );
 }

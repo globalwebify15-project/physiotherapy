@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../utils/app_storage.dart';
 import '../../utils/phone_helper.dart';
 import '../../services/api_service.dart';
@@ -196,6 +197,33 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       ),
+    );
+  }
+
+  Widget _buildLegalLinkTile({
+    required IconData icon,
+    required String title,
+    required String url,
+    bool isDestructive = false,
+  }) {
+    final color = isDestructive ? const Color(0xFFEF4444) : const Color(0xFF0F172A);
+    final iconColor = isDestructive ? const Color(0xFFEF4444) : const Color(0xFF0F766E);
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: isDestructive ? const Color(0xFFFEF2F2) : const Color(0xFFF1F5F9),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: color),
+      ),
+      trailing: const Icon(Icons.open_in_new_rounded, size: 17, color: Color(0xFF94A3B8)),
+      onTap: () async {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      },
     );
   }
 
@@ -450,6 +478,63 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                           ),
                           child: const Text('Clear', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  _buildSectionHeader('Legal, Policies & Compliance'),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Column(
+                      children: [
+                        _buildLegalLinkTile(
+                          icon: Icons.privacy_tip_outlined,
+                          title: 'Privacy Policy',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/privacy',
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildLegalLinkTile(
+                          icon: Icons.description_outlined,
+                          title: 'Terms & Conditions',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/terms',
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildLegalLinkTile(
+                          icon: Icons.assignment_return_outlined,
+                          title: '7-Day Refund & Cancellation Policy',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/refund-policy',
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildLegalLinkTile(
+                          icon: Icons.local_shipping_outlined,
+                          title: 'Service Delivery & Fulfillment',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/shipping-delivery-policy',
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildLegalLinkTile(
+                          icon: Icons.medical_information_outlined,
+                          title: 'Medical Disclaimer',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/medical-disclaimer',
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildLegalLinkTile(
+                          icon: Icons.contact_support_outlined,
+                          title: 'Contact Us & Grievance Officer',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/contact-us',
+                        ),
+                        const Divider(height: 1, indent: 56),
+                        _buildLegalLinkTile(
+                          icon: Icons.delete_forever_outlined,
+                          title: 'Request Account Deletion',
+                          url: 'https://physiotherapy-backend-nextjs.vercel.app/delete-account',
+                          isDestructive: true,
                         ),
                       ],
                     ),
