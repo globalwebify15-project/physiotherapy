@@ -1,5 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../services/api_service.dart';
+import '../../utils/app_storage.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -10,31 +13,88 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
+  final ApiService _apiService = ApiService();
   int _currentPage = 0;
 
-  final List<Map<String, dynamic>> _valueSlides = const [
-    {
-      'icon': Icons.home_work_rounded,
-      'color': Color(0xFF0F766E),
-      'title': 'Doorstep Home Care in 60 Mins',
-      'desc':
-          'Senior licensed physiotherapists visit your residence across Ranchi with portable electrotherapy & recovery kits.',
-    },
-    {
-      'icon': Icons.local_hospital_rounded,
-      'color': Color(0xFF2563EB),
-      'title': 'In-Clinic Advanced Rehabilitation',
-      'desc':
-          'Modern spine decompression, chiropractic adjustments, Class-IV laser & neuro rehab at our Ashok Nagar clinic.',
-    },
-    {
-      'icon': Icons.volunteer_activism_rounded,
-      'color': Color(0xFFD97706),
-      'title': '24/7 Caretakers & Nursing Support',
-      'desc':
-          'Compassionate, verified bedside assistance for elderly, bedridden, and post-surgery patients in 2, 12, or 24-hr shifts.',
-    },
-  ];
+  Map<String, dynamic> _config = Map<String, dynamic>.from(ApiService.defaultOnboardingConfig);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDynamicConfig();
+  }
+
+  Future<void> _loadDynamicConfig() async {
+    // 1. Instantly restore cached onboarding CMS config if available
+    try {
+      final cachedRaw = await AppStorage.read(key: 'cms_onboarding_config');
+      if (cachedRaw != null && cachedRaw.isNotEmpty) {
+        final decoded = jsonDecode(cachedRaw);
+        if (decoded is Map && mounted) {
+          setState(() {
+            _config = Map<String, dynamic>.from(ApiService.defaultOnboardingConfig)
+              ..addAll(Map<String, dynamic>.from(decoded));
+          });
+        }
+      }
+    } catch (_) {}
+
+    // 2. Refresh live from MongoDB CMS via Next.js backend
+    try {
+      final liveConfig = await _apiService.fetchCmsOnboarding();
+      if (mounted) {
+        setState(() {
+          _config = liveConfig;
+          final slidesCount = _slides.length;
+          if (_currentPage >= slidesCount && slidesCount > 0) {
+            _currentPage = 0;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  List<Map<String, dynamic>> get _slides {
+    final raw = _config['slides'];
+    if (raw is List && raw.isNotEmpty) {
+      return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+    }
+    return List<Map<String, dynamic>>.from(
+      (ApiService.defaultOnboardingConfig['slides'] as List)
+          .map((e) => Map<String, dynamic>.from(e as Map)),
+    );
+  }
+
+  IconData _resolveSlideIcon(String? iconKey) {
+    switch ((iconKey ?? '').toLowerCase()) {
+      case 'home_care':
+        return Icons.home_work_rounded;
+      case 'clinic_rehab':
+        return Icons.local_hospital_rounded;
+      case 'caretaker':
+        return Icons.volunteer_activism_rounded;
+      case 'rehab':
+        return Icons.accessibility_new_rounded;
+      case 'verified':
+        return Icons.verified_user_rounded;
+      case 'schedule':
+        return Icons.schedule_rounded;
+      default:
+        return Icons.medical_services_rounded;
+    }
+  }
+
+  Color _resolveSlideColor(String? hex) {
+    final cleaned = (hex ?? '').replaceAll('#', '').trim();
+    if (cleaned.length == 6) {
+      final parsed = int.tryParse('FF$cleaned', radix: 16);
+      if (parsed != null) return Color(parsed);
+    } else if (cleaned.length == 8) {
+      final parsed = int.tryParse(cleaned, radix: 16);
+      if (parsed != null) return Color(parsed);
+    }
+    return const Color(0xFF0F766E);
+  }
 
   @override
   void dispose() {
@@ -46,6 +106,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget build(BuildContext context) {
     const brandTeal = Color(0xFF0F766E);
     const darkSlate = Color(0xFF0F172A);
+
+    final brandShortCode = (_config['brandShortCode'] ?? 'QP').toString();
+    final brandName = (_config['brandName'] ?? 'QuickPhysio24.com').toString();
+    final ratingBadge = (_config['ratingBadge'] ?? '4.9 (350+ Cases)').toString().replaceAll('★', '').trim();
+    final experienceBadge = (_config['experienceBadge'] ?? '16+ Yrs Experience').toString();
+    final clinicSubtitle = (_config['clinicSubtitle'] ?? 'Synergy Global Hospital, Bariatu, Ranchi').toString();
+    final showPromoPill = _config['showPromoPill'] != false;
+    final promoPillText = (_config['promoPillText'] ?? 'Flat 25% OFF on 5-Session Rehab Packages')
+        .toString()
+        .replaceAll('🏷️', '')
+        .trim();
+    final headline = (_config['headline'] ?? 'Expert Physiotherapy\n& Home Doctor Care').toString();
+    final subtitle = (_config['subtitle'] ??
+            'Painless mobility, stroke paralysis recovery, and certified 24/7 caretakers at your doorstep in Ranchi.')
+        .toString();
+    final doctorInitials = (_config['doctorInitials'] ?? 'DR').toString();
+    final doctorNames = (_config['doctorNames'] ?? 'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar').toString();
+    final doctorCredentials =
+        (_config['doctorCredentials'] ?? 'BPT, MIAP, JSCPT • 16+ Years Clinical Excellence').toString();
+    final primaryCtaText = (_config['primaryCtaText'] ?? 'Get Started / शुरू करें').toString();
+    final secondaryCtaText = (_config['secondaryCtaText'] ?? 'I already have an account').toString();
+    final slides = _slides;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -73,9 +155,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             )
                           ],
                         ),
-                        child: const Text(
-                          'QP',
-                          style: TextStyle(
+                        child: Text(
+                          brandShortCode,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
                             fontWeight: FontWeight.w900,
@@ -84,9 +166,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      const Text(
-                        'QuickPhysio24.com',
-                        style: TextStyle(
+                      Text(
+                        brandName,
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
                           color: darkSlate,
@@ -116,10 +198,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
                 child: Column(
                   children: [
-                    // Style A: Medical Hero Card with Floating Glassmorphic Badges
+                    // Medical Hero Card with Floating Glassmorphic Badges (Dynamic CMS)
                     Container(
                       width: double.infinity,
-                      height: 220,
+                      constraints: const BoxConstraints(minHeight: 220),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
                           colors: [
@@ -162,12 +244,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   ],
                                 ),
                                 child: Row(
-                                  children: const [
-                                    Icon(Icons.star_rounded, size: 14, color: Color(0xFFD97706)),
-                                    SizedBox(width: 4),
+                                  children: [
+                                    const Icon(Icons.star_rounded, size: 14, color: Color(0xFFD97706)),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      '4.9 ★ (350+ Cases)',
-                                      style: TextStyle(
+                                      ratingBadge,
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
                                         color: Color(0xFF0F172A),
@@ -191,12 +273,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                   ],
                                 ),
                                 child: Row(
-                                  children: const [
-                                    Icon(Icons.verified_rounded, size: 13, color: Color(0xFF059669)),
-                                    SizedBox(width: 4),
+                                  children: [
+                                    const Icon(Icons.verified_rounded, size: 13, color: Color(0xFF059669)),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      '16+ Yrs Experience',
-                                      style: TextStyle(
+                                      experienceBadge,
+                                      style: const TextStyle(
                                         fontSize: 10,
                                         fontWeight: FontWeight.w900,
                                         color: Color(0xFF0F172A),
@@ -207,6 +289,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 14),
 
                           // Center Graphic
                           Column(
@@ -227,9 +310,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ),
                               ),
                               const SizedBox(height: 8),
-                              const Text(
-                                'QuickPhysio24.com',
-                                style: TextStyle(
+                              Text(
+                                brandName,
+                                style: const TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.white,
@@ -237,9 +320,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ),
                               ),
                               const SizedBox(height: 2),
-                              const Text(
-                                'Ashok Nagar Clinic & Doorstep Home Care',
-                                style: TextStyle(
+                              Text(
+                                clinicSubtitle,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                   color: Color(0xFFCCFBF1),
@@ -248,39 +332,51 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ],
                           ),
 
-                          // Bottom Promotional Pill
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFDE68A),
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: const [
-                                BoxShadow(
-                                  color: Colors.black12,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              '🏷️ Flat 25% OFF on 5-Session Rehab Packages',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: Color(0xFF78350F),
+                          if (showPromoPill && promoPillText.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFDE68A),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: const [
+                                  BoxShadow(
+                                    color: Colors.black12,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.local_offer_rounded, size: 13, color: Color(0xFF92400E)),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      promoPillText,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: Color(0xFF78350F),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
                     const SizedBox(height: 18),
 
-                    // Title & Description
-                    const Text(
-                      'Expert Physiotherapy\n& Home Doctor Care',
+                    // Title & Description (Dynamic CMS)
+                    Text(
+                      headline,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 22,
                         fontWeight: FontWeight.w900,
                         color: darkSlate,
@@ -288,10 +384,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Painless mobility, stroke paralysis recovery, and certified 24/7 caretakers at your doorstep in Ranchi.',
+                    Text(
+                      subtitle,
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
                         color: Color(0xFF64748B),
                         fontWeight: FontWeight.w500,
@@ -300,16 +396,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Swipeable Feature Highlights Card Carousel
+                    // Swipeable Feature Highlights Card Carousel (Dynamic CMS)
                     SizedBox(
                       height: 104,
                       child: PageView.builder(
                         controller: _pageController,
-                        itemCount: _valueSlides.length,
+                        itemCount: slides.length,
                         onPageChanged: (idx) => setState(() => _currentPage = idx),
                         itemBuilder: (context, index) {
-                          final slide = _valueSlides[index];
-                          final Color iconCol = slide['color'] as Color;
+                          final slide = slides[index];
+                          final Color iconCol = _resolveSlideColor(slide['colorHex']?.toString());
+                          final IconData iconData = _resolveSlideIcon(slide['iconKey']?.toString());
 
                           return Container(
                             margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -337,7 +434,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   alignment: Alignment.center,
-                                  child: Icon(slide['icon'] as IconData, color: iconCol, size: 22),
+                                  child: Icon(iconData, color: iconCol, size: 22),
                                 ),
                                 const SizedBox(width: 12),
                                 Expanded(
@@ -346,7 +443,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Text(
-                                        slide['title'] as String,
+                                        (slide['title'] ?? '').toString(),
                                         style: const TextStyle(
                                           fontSize: 13,
                                           fontWeight: FontWeight.w800,
@@ -355,7 +452,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
-                                        slide['desc'] as String,
+                                        (slide['desc'] ?? '').toString(),
                                         style: const TextStyle(
                                           fontSize: 11,
                                           color: Color(0xFF64748B),
@@ -378,7 +475,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     // Dots Indicator
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: List.generate(_valueSlides.length, (index) {
+                      children: List.generate(slides.length, (index) {
                         final isSel = _currentPage == index;
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
@@ -394,7 +491,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                     const SizedBox(height: 14),
 
-                    // Doctor Credential Bar
+                    // Doctor Credential Bar (Dynamic CMS)
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -413,9 +510,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             alignment: Alignment.center,
-                            child: const Text(
-                              'DR',
-                              style: TextStyle(
+                            child: Text(
+                              doctorInitials,
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                                 fontSize: 11,
@@ -426,18 +523,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              children: const [
+                              children: [
                                 Text(
-                                  'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar',
-                                  style: TextStyle(
+                                  doctorNames,
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
                                     color: darkSlate,
                                   ),
                                 ),
                                 Text(
-                                  'BPT, MIAP, JSCPT • 16+ Years Clinical Excellence',
-                                  style: TextStyle(
+                                  doctorCredentials,
+                                  style: const TextStyle(
                                     fontSize: 10,
                                     color: brandTeal,
                                     fontWeight: FontWeight.w600,
@@ -466,7 +563,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ElevatedButton(
-                    onPressed: () => context.go('/login'),
+                    onPressed: () => context.go('/login?mode=new'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: brandTeal,
                       foregroundColor: Colors.white,
@@ -476,21 +573,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Text(
-                      'Get Started / शुरू करें',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          primaryCtaText,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(Icons.arrow_forward_rounded, size: 18),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 6),
                   TextButton(
-                    onPressed: () => context.go('/login'),
+                    onPressed: () => context.go('/login?mode=returning'),
                     style: TextButton.styleFrom(
                       foregroundColor: const Color(0xFF64748B),
                       padding: const EdgeInsets.symmetric(vertical: 6),
                     ),
-                    child: const Text(
-                      'I already have an account',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    child: Text(
+                      secondaryCtaText,
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],

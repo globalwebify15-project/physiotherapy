@@ -251,6 +251,43 @@ class ApiService {
     },
   ];
 
+  static final Map<String, dynamic> defaultOnboardingConfig = {
+    'brandShortCode': 'QP',
+    'brandName': 'QuickPhysio24.com',
+    'ratingBadge': '4.9 (350+ Cases)',
+    'experienceBadge': '16+ Yrs Experience',
+    'clinicSubtitle': 'Synergy Global Hospital, Bariatu, Ranchi',
+    'promoPillText': 'Flat 25% OFF on 5-Session Rehab Packages',
+    'showPromoPill': true,
+    'headline': 'Expert Physiotherapy\n& Home Doctor Care',
+    'subtitle': 'Painless mobility, stroke paralysis recovery, and certified 24/7 caretakers at your doorstep in Ranchi.',
+    'doctorInitials': 'DR',
+    'doctorNames': 'Dr. Rajnish Bariyar & Dr. Priyanka Bariyar',
+    'doctorCredentials': 'BPT, MIAP, JSCPT • 16+ Years Clinical Excellence',
+    'primaryCtaText': 'Get Started / शुरू करें',
+    'secondaryCtaText': 'I already have an account',
+    'slides': [
+      {
+        'iconKey': 'home_care',
+        'colorHex': '#0F766E',
+        'title': 'Doorstep Home Care in 60 Mins',
+        'desc': 'Senior licensed physiotherapists visit your residence across Ranchi with portable electrotherapy & recovery kits.',
+      },
+      {
+        'iconKey': 'clinic_rehab',
+        'colorHex': '#2563EB',
+        'title': 'In-Clinic Advanced Rehabilitation',
+        'desc': 'Modern spine decompression, chiropractic adjustments, Class-IV laser & neuro rehab at our Bariatu hospital center.',
+      },
+      {
+        'iconKey': 'caretaker',
+        'colorHex': '#D97706',
+        'title': '24/7 Caretakers & Nursing Support',
+        'desc': 'Compassionate, verified bedside assistance for elderly, bedridden, and post-surgery patients in 2, 12, or 24-hr shifts.',
+      },
+    ],
+  };
+
   // High-performance In-Memory Cache with TTL to eliminate UI lag & network freezing
   static final Map<String, dynamic> _memoryCache = {};
   static final Map<String, DateTime> _cacheTimestamps = {};
@@ -422,6 +459,12 @@ class ApiService {
             statusCode: 200,
             data: {'success': true, 'key': 'faqs', 'content': defaultFaqs},
           );
+        } else if (key == 'onboarding_config') {
+          return Response(
+            requestOptions: RequestOptions(path: path),
+            statusCode: 200,
+            data: {'success': true, 'key': 'onboarding_config', 'content': defaultOnboardingConfig},
+          );
         }
         return Response(
           requestOptions: RequestOptions(path: path),
@@ -431,6 +474,7 @@ class ApiService {
             'cmsBlocks': [
               {'key': 'homepage_banners', 'content': defaultBanners},
               {'key': 'faqs', 'content': defaultFaqs},
+              {'key': 'onboarding_config', 'content': defaultOnboardingConfig},
               {
                 'key': 'contact_details',
                 'content': {
@@ -1080,6 +1124,48 @@ class ApiService {
         'isActive': true,
       },
     ];
+  }
+
+  /// Fetches live Onboarding / Welcome Screen configuration from MongoDB CMS,
+  /// with local AppStorage cache & instant fallback defaults.
+  Future<Map<String, dynamic>> fetchCmsOnboarding() async {
+    try {
+      final res = await get('/cms', queryParameters: {'key': 'onboarding_config'}, forceRefresh: true);
+      if (res.statusCode == 200 && res.data != null) {
+        dynamic content = res.data['content'];
+        if (content == null && res.data['cmsBlocks'] is List) {
+          for (final b in (res.data['cmsBlocks'] as List)) {
+            if (b is Map && b['key'] == 'onboarding_config') {
+              content = b['content'];
+              break;
+            }
+          }
+        }
+        if (content is Map && content.isNotEmpty) {
+          final merged = Map<String, dynamic>.from(defaultOnboardingConfig)
+            ..addAll(Map<String, dynamic>.from(content));
+          try {
+            await _storage.write(key: 'cms_onboarding_config', value: jsonEncode(merged));
+          } catch (_) {}
+          return merged;
+        }
+      }
+    } catch (e) {
+      print('[fetchCmsOnboarding Warning, using cache/defaults]: $e');
+    }
+
+    try {
+      final cachedRaw = await _storage.read(key: 'cms_onboarding_config');
+      if (cachedRaw != null && cachedRaw.isNotEmpty) {
+        final decoded = jsonDecode(cachedRaw);
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(defaultOnboardingConfig)
+            ..addAll(Map<String, dynamic>.from(decoded));
+        }
+      }
+    } catch (_) {}
+
+    return Map<String, dynamic>.from(defaultOnboardingConfig);
   }
 }
 

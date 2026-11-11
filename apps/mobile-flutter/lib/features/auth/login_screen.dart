@@ -7,7 +7,8 @@ import '../../services/api_service.dart';
 import '../../utils/app_storage.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  final String? initialMode;
+  const LoginScreen({super.key, this.initialMode});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -17,6 +18,17 @@ class _LoginScreenState extends State<LoginScreen> {
   final _mobileController = TextEditingController();
   final _apiService = ApiService();
   bool _isLoading = false;
+  late String _authMode; // 'new', 'returning', or 'unified'
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialMode == 'new' || widget.initialMode == 'returning') {
+      _authMode = widget.initialMode!;
+    } else {
+      _authMode = 'unified';
+    }
+  }
 
   @override
   void dispose() {
@@ -389,6 +401,53 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isNewMode = _authMode == 'new';
+    final bool isReturningMode = _authMode == 'returning';
+
+    final IconData headerIcon = isNewMode
+        ? Icons.person_add_alt_1_rounded
+        : isReturningMode
+            ? Icons.verified_user_rounded
+            : Icons.medical_services_rounded;
+
+    final String badgeLabel = isNewMode
+        ? 'NEW PATIENT REGISTRATION'
+        : isReturningMode
+            ? 'RETURNING PATIENT SIGN IN'
+            : 'PATIENT PORTAL';
+
+    final String titleText = isNewMode
+        ? 'Start Your Care Journey'
+        : isReturningMode
+            ? 'Welcome Back'
+            : 'Welcome to QuickPhysio24';
+
+    final String subtitleText = isNewMode
+        ? 'Create your patient profile to book doorstep home visits or clinic physiotherapy consultations.'
+        : isReturningMode
+            ? 'Sign in to access your booked appointments, assigned physiotherapists & recovery plans.'
+            : 'Enter your mobile number or continue with Google or Apple to sign in or create your patient account.';
+
+    final String ctaLabel = isNewMode
+        ? 'Continue & Get OTP / आगे बढ़ें'
+        : isReturningMode
+            ? 'Sign In with OTP / लॉगिन करें'
+            : 'Get OTP / आगे बढ़ें';
+
+    final IconData ctaIcon = isReturningMode ? Icons.login_rounded : Icons.arrow_forward_rounded;
+
+    final String benefitText = isNewMode
+        ? 'First-time patient? Complete your quick profile setup right after verification.'
+        : isReturningMode
+            ? 'Your past appointments, prescriptions & care plans sync automatically.'
+            : 'New patients register seamlessly; returning patients resume right where they left off.';
+
+    final IconData benefitIcon = isNewMode
+        ? Icons.assignment_turned_in_outlined
+        : isReturningMode
+            ? Icons.sync_rounded
+            : Icons.shield_outlined;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
@@ -405,21 +464,66 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 12),
-              // Brand Icon
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0F766E).withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.medical_services_rounded, color: Color(0xFF0F766E), size: 32),
+              const SizedBox(height: 8),
+              // Professional Brand Icon + Mode Pill
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0F766E).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Icon(headerIcon, color: const Color(0xFF0F766E), size: 30),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isNewMode
+                          ? const Color(0xFFECFDF5)
+                          : isReturningMode
+                              ? const Color(0xFFF0FDFA)
+                              : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isNewMode || isReturningMode
+                            ? const Color(0xFF99F6E4)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isNewMode
+                              ? Icons.fiber_new_rounded
+                              : isReturningMode
+                                  ? Icons.history_rounded
+                                  : Icons.health_and_safety_outlined,
+                          size: 14,
+                          color: const Color(0xFF0F766E),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          badgeLabel,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F766E),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              const Text(
-                'Welcome Back! 👋',
-                style: TextStyle(
+              Text(
+                titleText,
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF0F172A),
@@ -427,16 +531,112 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              const Text(
-                'Sign in to access your appointments, physiotherapists & care plans.',
-                style: TextStyle(
-                  fontSize: 14,
+              Text(
+                subtitleText,
+                style: const TextStyle(
+                  fontSize: 13.5,
                   color: Color(0xFF64748B),
                   fontWeight: FontWeight.w500,
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 20),
+
+              // New Patient vs Returning Patient Mode Selector
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE2E8F0).withOpacity(0.55),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _authMode = 'new'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isNewMode ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(11),
+                            boxShadow: isNewMode
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.person_add_outlined,
+                                size: 15,
+                                color: isNewMode ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'New Patient',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isNewMode ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () => setState(() => _authMode = 'returning'),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isReturningMode ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(11),
+                            boxShadow: isReturningMode
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.verified_user_outlined,
+                                size: 15,
+                                color: isReturningMode ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Existing Patient',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: isReturningMode ? const Color(0xFF0F766E) : const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
 
               // Mobile text field matching design system
               Container(
@@ -477,9 +677,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // Sign In Button
+              // Sign In / Continue Button
               ElevatedButton(
                 onPressed: _isLoading ? null : _sendOtp,
                 style: ElevatedButton.styleFrom(
@@ -497,12 +697,46 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
                       )
-                    : const Text(
-                        'Get OTP / आगे बढ़ें',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            ctaLabel,
+                            style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(ctaIcon, size: 19),
+                        ],
                       ),
               ),
-              const SizedBox(height: 36),
+              const SizedBox(height: 12),
+
+              // Helpful Context Strip for New vs Returning User
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDFA),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFCCFBF1)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(benefitIcon, size: 16, color: const Color(0xFF0F766E)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        benefitText,
+                        style: const TextStyle(
+                          fontSize: 11.5,
+                          color: Color(0xFF134E4A),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 28),
 
               Row(
                 children: const [

@@ -7,6 +7,7 @@ import EditFaqModal from '@/components/EditFaqModal';
 import EditOfferModal from '@/components/EditOfferModal';
 import CmsSubmitButton from '@/components/CmsSubmitButton';
 import CompliancePagesEditor from '@/components/CompliancePagesEditor';
+import OnboardingConfigEditor from '@/components/OnboardingConfigEditor';
 import { 
   Settings, 
   Phone, 
@@ -605,6 +606,10 @@ export default async function CMSPage() {
   for (const doc of complianceDocs) {
     compliancePagesMap[(doc as any).key] = (doc as any).content;
   }
+
+  // 8. Load Onboarding Welcome Screen Config
+  const onboardingCMS = await CMS.findOne({ key: 'onboarding_config' }).lean();
+  const onboardingConfig = (onboardingCMS as any)?.content || null;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -1389,7 +1394,12 @@ export default async function CMSPage() {
         </div>
       </div>
 
-      {/* Row 4: Mandatory Compliance & Legal Pages Editor */}
+      {/* Row 4: Mobile App Onboarding & Welcome Screen */}
+      <OnboardingConfigEditor
+        initialConfig={onboardingConfig ? JSON.parse(JSON.stringify(onboardingConfig)) : null}
+      />
+
+      {/* Row 5: Mandatory Compliance & Legal Pages Editor */}
       <CompliancePagesEditor initialPages={JSON.parse(JSON.stringify(compliancePagesMap))} />
     </div>
   );

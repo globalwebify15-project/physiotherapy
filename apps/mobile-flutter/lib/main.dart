@@ -143,7 +143,10 @@ class PhysioApp extends ConsumerWidget {
         ),
         GoRoute(
           path: '/login',
-          builder: (context, state) => const LoginScreen(),
+          builder: (context, state) {
+            final mode = state.uri.queryParameters['mode'];
+            return LoginScreen(initialMode: mode);
+          },
         ),
         GoRoute(
           path: '/otp',

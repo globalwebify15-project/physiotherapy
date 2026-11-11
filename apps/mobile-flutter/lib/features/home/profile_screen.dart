@@ -975,7 +975,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () async {
                               await AppStorage.deleteAll();
                               if (context.mounted) {
-                                context.go('/login');
+                                context.go('/login?mode=returning');
                               }
                             },
                           ),

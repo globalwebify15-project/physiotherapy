@@ -573,7 +573,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       Navigator.pop(ctx);
                                       await AppStorage.deleteAll();
                                       if (mounted) {
-                                        context.go('/login');
+                                        context.go('/login?mode=returning');
                                       }
                                     },
                                     style: ElevatedButton.styleFrom(
